@@ -106,6 +106,21 @@ class BillHomeViewModel {
             print("汇率获取失败：\(error)")
         }
     }
+    func deleteTransaction(_ item: Transaction) {
+        // 在这里可以做更多事情：
+        // - 埋点：Analytics.log("delete_transaction")
+        // - 检查：if item.amount > 10000 { ... }
+        
+        repository.delete(item)
+        
+        // 3. 处理保存和错误
+        do {
+            try repository.save()
+        } catch {
+            print("删除失败: \(error)")
+            // 这里可以设置一个 errorMessage 属性，让 View 弹窗
+        }
+    }
 
     /// 同步卡片模板 (通常在 onAppear 调用)
     func syncTemplates(context: ModelContext) {

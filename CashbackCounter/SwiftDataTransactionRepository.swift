@@ -3,12 +3,13 @@ import Foundation
 import SwiftData
 
 class TransactionRepository: TransactionRepositoryProtocol {
+    
     private let context: ModelContext
 
     init(context: ModelContext) {
         self.context = context
     }
-
+    
     /// 获取账单数据
     func fetchTransactions(
         predicate: Predicate<Transaction>? = nil,

@@ -3,6 +3,8 @@ import Foundation
 import SwiftData
 
 protocol TransactionRepositoryProtocol {
+    //导入逻辑
+
     func fetchTransactions(predicate: Predicate<Transaction>?, sortBy: [SortDescriptor<Transaction>]) throws -> [Transaction]
     func insert(_ transaction: Transaction)
     func delete(_ transaction: Transaction)

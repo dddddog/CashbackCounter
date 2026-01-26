@@ -179,7 +179,7 @@ extension BillHomeView {
                             Button { viewModel.transactionToEdit = item } label: { Label("编辑", systemImage: "pencil") }
                             Button { viewModel.incomeTargetTransaction = item } label: { Label("添加收入", systemImage: "plus.rectangle.on.rectangle") }
                             Divider()
-                            Button(role: .destructive) { context.delete(item) } label: { Label("删除", systemImage: "trash") }
+                            Button(role: .destructive) { viewModel.deleteTransaction(item) } label: { Label("删除", systemImage: "trash") }
                         }
                     
                     // 渲染关联的收入
