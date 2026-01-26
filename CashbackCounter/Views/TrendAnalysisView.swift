@@ -1,234 +1,158 @@
+// TrendAnalysisView.swift
 import SwiftUI
 import Charts
-import SwiftData
-
-// 1. 定义分析类型：支出 vs 返现
-enum TrendType {
-    case expense  // 支出
-    case cashback // 返现
-    
-    var title: LocalizedStringKey {
-        switch self {
-        case .expense : return "支出"
-        case .cashback: return "返现"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .expense: return .red   // 支出用红色
-        case .cashback: return .green // 返现用绿色
-        }
-    }
-}
-
-// 数据点结构
-struct MonthlyData: Identifiable {
-    let id = UUID()
-    let date: Date
-    let amount: Double
-}
 
 struct TrendAnalysisView: View {
     @Environment(\.dismiss) var dismiss
-    @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
-    
-    // 外部传入的数据
-    var transactions: [Transaction]
-    var cards: [CreditCard]
-    var exchangeRates: [String: Double]
-    
-    // 👇 核心：当前分析的类型 (由外部传入)
-    let type: TrendType
-    
-    @State private var selectedCard: CreditCard? = nil
-    
-    // 计算图表数据
-    var chartData: [MonthlyData] {
-        let calendar = Calendar.current
-        let now = Date()
-        var data: [MonthlyData] = []
-        
-        for i in 0..<12 {
-            if let date = calendar.date(byAdding: .month, value: -i, to: now) {
-                let components = calendar.dateComponents([.year, .month], from: date)
-                
-                // 筛选
-                let monthlyTransactions = transactions.filter { t in
-                    let tComponents = calendar.dateComponents([.year, .month], from: t.date)
-                    let isSameMonth = tComponents.year == components.year && tComponents.month == components.month
-                    let isCardMatch = (selectedCard == nil) || (t.card == selectedCard)
-                    return isSameMonth && isCardMatch
-                }
-                
-                // 计算总额 (根据类型区分逻辑)
-                let total = monthlyTransactions.reduce(0) { sum, t in
-                    let amountToAdd: Double
-                    // 👇 分支逻辑
-                    if type == .expense {
-                        amountToAdd = t.billingAmount // 支出算入账金额
-                    } else {
-                        amountToAdd = CashbackService.calculateCashback(for: t) // 返现算返现额
-                    }
-                    
-                    // 汇率换算
-                    let code = t.card?.issueRegion.currencyCode ?? "CNY"
-                    let rate = exchangeRates[code] ?? 1.0
-                    return sum + (amountToAdd / rate)
-                }
-                
-                data.append(MonthlyData(date: date, amount: total))
-            }
-        }
-        return data.reversed()
+    @State private var viewModel: TrendAnalysisViewModel
+
+    init(transactions: [Transaction], exchangeRates: [String: Double], type: TrendAnalysisViewModel.TrendType) {
+        self._viewModel = State(initialValue: TrendAnalysisViewModel(
+            transactions: transactions,
+            exchangeRates: exchangeRates,
+            type: type
+        ))
     }
-    
+
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                
-                // --- 1. 图表区域 ---
-                VStack(alignment: .leading, spacing: 8) {
-                    Group {
-                        if let card = selectedCard {
-                            // 「招商银行 支出趋势」这种
-                            (Text(card.bankName) + Text(" ") + Text(type.title) + Text("趋势"))
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
-                        } else {
-                            // 「总支出趋势」这种
-                            (Text("总") + Text(type.title) + Text("趋势"))
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
+            ScrollView {
+                VStack(spacing: 25) {
+                    // 1. 总额概览
+                    summaryHeader
+                    
+                    // 2. 时间范围选择
+                    Picker("时间范围", selection: $viewModel.selectedTimeframe) {
+                        ForEach(TrendAnalysisViewModel.Timeframe.allCases, id: \.self) { frame in
+                            Text(frame.rawValue).tag(frame)
                         }
                     }
-                    
-                    // 动态颜色
-                    Text("近12个月累计: \(chartData.reduce(0){ $0 + $1.amount }.formatted(.currency(code: mainCurrencyCode)))")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
-                        .foregroundColor(type.color) // 👇 使用类型颜色
-                        .padding(.bottom, 8)
-                    
-                    Chart(chartData) { item in
-                        // 线条
-                        LineMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(type.color) // 👇 使用类型颜色
-                        .lineStyle(StrokeStyle(lineWidth: 3))
-                        
-                        // 渐变填充
-                        AreaMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [type.color.opacity(0.3), type.color.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        
-                        // 数据点
-                        PointMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .foregroundStyle(.white)
-                        .symbolSize(60)
-                        .annotation(position: .top) {
-                            if item.amount > 0 {
-                                Text("\(Int(item.amount))")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.primary.opacity(0.7))
-                                    .padding(.bottom, 4)
-                            }
-                        }
-                    }
-                    .frame(height: 260)
+                    .pickerStyle(.segmented)
                     .padding(.horizontal)
-                    .padding(.bottom, 16)
-                    // X轴：保持你喜欢的自动间隔
-                    .chartXAxis {
-                        AxisMarks { value in
-                            AxisValueLabel(format: .dateTime.month(), centered: true)
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                    }
-                    // Y轴
-                    .chartYAxis {
-                        AxisMarks { value in
-                            AxisGridLine()
-                            AxisValueLabel()
-                                .font(.system(size: 13))
-                        }
-                    }
+
+                    // 3. 图表展示
+                    chartContainer
+                    
+                    // 4. 数据详情列表
+                    detailsList
                 }
-                .background(Color(uiColor: .secondarySystemGroupedBackground))
-                .cornerRadius(16)
-                .padding(.horizontal)
-                
-                // --- 2. 卡片选择列表 ---
-                List {
-                    Section(header: Text("选择卡片查看详情")) {
-                        Button(action: { withAnimation { selectedCard = nil } }) {
-                            HStack {
-                                ZStack {
-                                    Circle().fill(Color.gray.opacity(0.2)).frame(width: 40, height: 40)
-                                    Image(systemName: "square.stack.3d.up.fill").foregroundColor(.primary)
-                                }
-                                Text("所有卡片汇总").foregroundColor(.primary).font(.body)
-                                Spacer()
-                                if selectedCard == nil {
-                                    Image(systemName: "checkmark").foregroundColor(.blue)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        
-                        ForEach(cards) { card in
-                            Button(action: { withAnimation { selectedCard = card } }) {
-                                HStack {
-                                    Circle()
-                                        .fill(LinearGradient(colors: card.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Text(card.bankName.prefix(1))
-                                                .font(.caption.bold())
-                                                .foregroundColor(.white)
-                                        )
-                                    VStack(alignment: .leading) {
-                                        Text(card.bankName).foregroundColor(.primary).font(.body)
-                                        Text(card.type).font(.subheadline).foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    if selectedCard == card {
-                                        Image(systemName: "checkmark").foregroundColor(.blue)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                }
-                .listStyle(.insetGrouped)
+                .padding(.vertical)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle(
-                Text(type.title) + Text("分析")
-            )
+            .navigationTitle(viewModel.type == .expense ? "支出趋势" : "返现趋势")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - 子组件
+extension TrendAnalysisView {
+    private var summaryHeader: some View {
+        VStack(spacing: 8) {
+            Text("统计时段总额")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text(String(format: "%.2f", viewModel.totalAmount))
+                .font(.system(.largeTitle, design: .rounded))
+                .fontWeight(.bold)
+        }
+    }
+
+    private var chartContainer: some View {
+            // 1. 定义基础颜色和渐变色
+            let baseColor = viewModel.type == .expense ? Color.red : Color.green
+            let gradientColor = LinearGradient(
+                gradient: Gradient(colors: [baseColor.opacity(0.4), baseColor.opacity(0.05)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            
+            // 确定 X 轴单位 (沿用之前的修复逻辑)
+            let xAxisUnit: Calendar.Component = (viewModel.selectedTimeframe == .sevenDays || viewModel.selectedTimeframe == .oneMonth) ? .day : .month
+
+            return Chart {
+                ForEach(viewModel.chartData) { point in
+                    // 2. 底层：阴影区域 (AreaMark)
+                    AreaMark(
+                        x: .value("日期", point.date, unit: xAxisUnit),
+                        y: .value("金额", point.amount)
+                    )
+                    .foregroundStyle(gradientColor)
+                    .interpolationMethod(.catmullRom) // 设置为平滑曲线
+
+                    // 3. 顶层：折线 (LineMark)
+                    LineMark(
+                        x: .value("日期", point.date, unit: xAxisUnit),
+                        y: .value("金额", point.amount)
+                    )
+                    .foregroundStyle(baseColor)
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)) // 加粗线条
+                    .interpolationMethod(.catmullRom) // 同样设置为平滑曲线
+                    
+                    // 可选：给数据点加个小圆点，让它更清晰
+                    PointMark(
+                         x: .value("日期", point.date, unit: xAxisUnit),
+                         y: .value("金额", point.amount)
+                    )
+                    .foregroundStyle(baseColor)
+                    .symbolSize(30) // 点的大小
+                }
+            }
+            .frame(height: 280) // 稍微调高一点高度
+            .padding(.horizontal)
+            // 4. Y轴优化：不强制包含0，让波动看起更明显
+            .chartYScale(domain: .automatic(includesZero: false))
+            // 5. X轴配置 (保持之前的修复)
+            .chartXAxis {
+                if viewModel.selectedTimeframe == .sevenDays || viewModel.selectedTimeframe == .oneMonth {
+                    AxisMarks(values: .stride(by: .day)) { _ in
+                        if viewModel.selectedTimeframe == .sevenDays { AxisGridLine() } // 7天显示网格
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.month().day(), centered: true)
+                    }
+                } else {
+                    AxisMarks(values: .stride(by: .month)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        // 优化：只显示简短的月份，如果是年初则显示年份
+                        if let date = value.as(Date.self) {
+                            let month = Calendar.current.component(.month, from: date)
+                            AxisValueLabel {
+                                Text(month == 1 ? date.formatted(.dateTime.year()) : date.formatted(.dateTime.month()))
+                            }
+                        }
+                    }
+                }
+            }
+            // 6. Y轴配置：隐藏轴线，只显示网格和数字，更简洁
+            .chartYAxis {
+                AxisMarks(position: .leading) {
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
+            }
+        }
+    
+    private var detailsList: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("历史记录").font(.headline).padding(.horizontal)
+            
+            ForEach(viewModel.chartData.reversed()) { point in
+                HStack {
+                    Text(point.date, format: .dateTime.year().month().day())
+                        .font(.subheadline)
+                    Spacer()
+                    Text(String(format: "%.2f", point.amount))
+                        .fontWeight(.medium)
+                }
+                .padding()
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .cornerRadius(12)
+                .padding(.horizontal)
             }
         }
     }

@@ -1,22 +1,21 @@
-//
-//  CardTemplateListView.swift
-//  CashbackCounter
-//
-//  Created by Junhao Huang on 11/23/25.
-//
-
 import SwiftUI
 import SwiftData
+
+// --- 1. 修复：定义 SheetType ---
+// 这个枚举用于控制父视图 CardListView 的弹窗逻辑
 
 struct CardTemplateListView: View {
     @Environment(\.modelContext) var context
     @Environment(\.dismiss) var dismiss
+    
+    // --- 2. 注入 Repository ---
+    let repository: TransactionRepositoryProtocol
+    
     @Query(sort: [
         SortDescriptor<CardTemplate>(\.bankName),
         SortDescriptor<CardTemplate>(\.type)
     ]) private var templates: [CardTemplate]
 
-    // 1. 控制跳转的状态：存用户选了哪个模板
     @State private var selectedTemplate: CardTemplate?
     @Binding var rootSheet: SheetType?
 
@@ -24,12 +23,16 @@ struct CardTemplateListView: View {
         NavigationView {
             List(templates) { item in
                 Button(action: {
-                    // 👇 点击后，不直接保存，而是记录选了谁
                     selectedTemplate = item
                 }) {
                     HStack {
+                        // 预览颜色
                         Circle()
-                            .fill(LinearGradient(colors: item.colors.map { Color(hex: $0) }, startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .fill(LinearGradient(
+                                colors: item.colors.map { Color(hex: $0) },
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
                             .frame(width: 40, height: 40)
 
                         VStack(alignment: .leading) {
@@ -49,12 +52,11 @@ struct CardTemplateListView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            // 👇 2. 核心跳转逻辑
-            // 当 selectedTemplate 有值时，弹出 AddCardView，并把模板传进去
+            // --- 3. 核心跳转：弹出 AddCardView ---
             .sheet(item: $selectedTemplate) { template in
-                AddCardView(template: template, onSaved: {
-                    // 当添加页保存成功时，执行这行代码：
-                    // 把首页的 activeSheet 设为 nil，所有弹窗瞬间全部消失！
+                // ✅ 这里必须传入 repository
+                AddCardView(repository: repository, template: template, onSaved: {
+                    // 当添加页保存成功时，关闭所有层级的弹窗
                     rootSheet = nil
                 })
             }

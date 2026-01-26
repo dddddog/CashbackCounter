@@ -1,50 +1,84 @@
-//
-//  StatBox.swift
-//  CashbackCounter
-//
-//  Created by Junhao Huang on 11/23/25.
-//
-
+// StatBox.swift
 import SwiftUI
 
 struct StatBox: View {
-    let title: LocalizedStringKey
+    let title: String
     let amount: String
     let icon: String
     let color: Color
-    
-    // 1. 安装传感器：探测当前是深色还是浅色模式
-    @Environment(\.colorScheme) var colorScheme
-    
+    var isLoading: Bool = false // 新增加载状态
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        HStack(spacing: 12) {
+            // 图标部分
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                
                 Image(systemName: icon)
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(color)
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary) // secondary 颜色会自动适配深浅
             }
             
-            Text(amount)
-                .font(.system(.title3, design: .rounded))
-                .fontWeight(.bold)
-                // 主标题文字默认是黑色的，在深色模式下会自动变白，不用管。
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fontWeight(.medium)
+                
+                if isLoading {
+                    // 骨架屏效果
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 20)
+                        .shimmer() // 自定义闪烁动画
+                } else {
+                    Text(amount)
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                        .minimumScaleFactor(0.8) // 防止金额过长溢出
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        // 2. 背景色升级：使用系统语义化颜色
-        // 浅色模式下是白色，深色模式下是深灰色
         .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(15)
-        // 3. 阴影与描边的处理
-        // 如果是深色模式，就去掉阴影 (color: .clear)；浅色模式才显示阴影
-        .shadow(color: colorScheme == .dark ? .clear : .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        // 4. 深色模式专属描边
-        // 在上面叠加一个圆角矩形，如果是深色模式，就画一圈细线；浅色模式线宽为0
-        .overlay(
-            RoundedRectangle(cornerRadius: 15)
-                .stroke(Color.gray.opacity(0.2), lineWidth: colorScheme == .dark ? 0.5 : 0)
-        )
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+    }
+}
+
+// 简单的闪烁动画效果
+extension View {
+    @ViewBuilder
+    func shimmer() -> some View {
+        self.modifier(ShimmerEffect())
+    }
+}
+
+struct ShimmerEffect: ViewModifier {
+    @State private var phase: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.5), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(width: geo.size.width * 2)
+                    .offset(x: -geo.size.width + (geo.size.width * 2 * phase))
+                }
+            )
+            .onAppear {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    phase = 1
+                }
+            }
     }
 }

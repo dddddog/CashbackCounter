@@ -11,9 +11,6 @@
         }
       }
     },
-    " " : {
-
-    },
     "- %@%@" : {
       "localizations" : {
         "en" : {
@@ -102,7 +99,21 @@
         }
       }
     },
+    "%@%@上限" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@上限"
+          }
+        }
+      }
+    },
+    "%@率 (%%)" : {
+
+    },
     "%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -169,6 +180,7 @@
       }
     },
     "1.0" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -534,6 +546,7 @@
       }
     },
     "从模板添加" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -752,6 +765,7 @@
       }
     },
     "分析" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -790,6 +804,7 @@
       }
     },
     "删除卡片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -812,6 +827,7 @@
       }
     },
     "删除图片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -915,6 +931,9 @@
         }
       }
     },
+    "历史记录" : {
+
+    },
     "发行地区" : {
       "localizations" : {
         "en" : {
@@ -960,6 +979,7 @@
       }
     },
     "同本币" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -980,6 +1000,9 @@
           }
         }
       }
+    },
+    "周期" : {
+
     },
     "商户名称 (例如：星巴克)" : {
       "localizations" : {
@@ -1048,6 +1071,7 @@
       }
     },
     "外币%@上限" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1064,6 +1088,7 @@
       }
     },
     "外币返现率 (%)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1152,6 +1177,7 @@
       }
     },
     "导入卡片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1218,6 +1244,7 @@
       }
     },
     "导出交易" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1240,6 +1267,7 @@
       }
     },
     "导出卡片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1414,6 +1442,7 @@
       }
     },
     "总" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1430,6 +1459,7 @@
       }
     },
     "总支出" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1446,6 +1476,7 @@
       }
     },
     "总返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1477,7 +1508,11 @@
         }
       }
     },
+    "我的卡包" : {
+
+    },
     "所有卡片汇总" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1570,6 +1605,7 @@
       }
     },
     "支出" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1584,6 +1620,9 @@
           }
         }
       }
+    },
+    "支出趋势" : {
+
     },
     "收入 %@" : {
       "localizations" : {
@@ -1612,6 +1651,7 @@
       }
     },
     "收入单" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1779,6 +1819,15 @@
         }
       }
     },
+    "日期" : {
+
+    },
+    "时间范围" : {
+
+    },
+    "暂无卡片" : {
+
+    },
     "暂无卡片，请先添加信用卡" : {
       "localizations" : {
         "en" : {
@@ -1818,6 +1867,7 @@
       }
     },
     "月份" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1878,6 +1928,7 @@
       }
     },
     "本币%@上限" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1894,6 +1945,7 @@
       }
     },
     "本币返现率 (%)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1916,6 +1968,7 @@
       }
     },
     "本年支出" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1932,6 +1985,7 @@
       }
     },
     "本年返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1948,6 +2002,7 @@
       }
     },
     "本月支出" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1964,6 +2019,7 @@
       }
     },
     "本月返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2295,6 +2351,9 @@
         }
       }
     },
+    "点击右上角加号，从模板或自定义添加你的第一张信用卡" : {
+
+    },
     "版本" : {
       "localizations" : {
         "en" : {
@@ -2377,6 +2436,9 @@
         }
       }
     },
+    "确定要删除这张卡片吗？删除后，该卡关联的交易记录将不再显示所属卡片，且自动提醒将被取消。" : {
+
+    },
     "确定要清除所有数据吗？" : {
       "localizations" : {
         "en" : {
@@ -2392,6 +2454,9 @@
           }
         }
       }
+    },
+    "确认删除" : {
+
     },
     "简体中文" : {
       "localizations" : {
@@ -2436,6 +2501,9 @@
           }
         }
       }
+    },
+    "统计时段总额" : {
+
     },
     "编辑" : {
       "localizations" : {
@@ -2546,6 +2614,7 @@
       }
     },
     "自定义添加" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2790,6 +2859,7 @@
       }
     },
     "趋势" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2828,6 +2898,7 @@
       }
     },
     "近12个月累计: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2844,6 +2915,7 @@
       }
     },
     "返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2874,6 +2946,12 @@
           }
         }
       }
+    },
+    "返现趋势" : {
+
+    },
+    "返现预览" : {
+
     },
     "还款提醒" : {
       "localizations" : {
@@ -2930,6 +3008,7 @@
       }
     },
     "选择卡片查看详情" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

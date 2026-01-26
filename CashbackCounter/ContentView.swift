@@ -5,13 +5,14 @@ import SwiftData
 struct ContentView: View {
     // 选中的 Tab 索引
     @State private var selectedTab = 0
-    
+    @Environment(\.modelContext) var context
     var body: some View {
+        let repo = TransactionRepository(context: context)
         // TabView 是底部导航栏的核心容器
         TabView(selection: $selectedTab) {
             
             // --- 左边：账单页 ---
-            BillHomeView()
+            BillHomeView(repository: repo)
                 .tabItem {
                     Image(systemName: selectedTab == 0 ? "doc.text.image.fill" : "doc.text.image")
                     Text("账单")
@@ -19,7 +20,7 @@ struct ContentView: View {
                 .tag(0)
             
             // --- 中间：拍照/记账页 ---
-            CameraRecordView()
+            CameraRecordView(repository: repo)
                 .tabItem {
                     Image(systemName: "camera.circle.fill") // 大圆圈图标
                     Text("拍一笔")
@@ -27,10 +28,9 @@ struct ContentView: View {
                 .tag(1)
             
             // --- 右边：信用卡页 ---
-            CardListView()
+            CardListView(repository: repo) // ✅ 传入创建好的 repo
                 .tabItem {
-                    Image(systemName: selectedTab == 2 ? "creditcard.fill" : "creditcard")
-                    Text("卡包")
+                    Label("卡包", systemImage: selectedTab == 2 ? "creditcard.fill" : "creditcard")
                 }
                 .tag(2)
             

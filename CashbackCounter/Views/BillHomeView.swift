@@ -1,107 +1,26 @@
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers // 👈 1. 必须加上这一行，否则无法识别文件类型
+import UniformTypeIdentifiers
+
 struct BillHomeView: View {
-    // 1. 拿到数据库上下文
+    // --- 1. 环境与持久化数据 ---
     @Environment(\.modelContext) var context
     
-    @Query(
-        sort: [
-            SortDescriptor(\Transaction.date, order: .reverse),
-            SortDescriptor(\Transaction.merchant, order: .forward)
-        ]
-    )
+    // 使用 @Query 仅用于获取数据源，逻辑筛选交给 ViewModel
+    @Query(sort: [
+        SortDescriptor(\Transaction.date, order: .reverse),
+        SortDescriptor(\Transaction.merchant, order: .forward)
+    ])
     var dbTransactions: [Transaction]
-    // 2. 控制弹窗
-    @State private var selectedTransaction: Transaction? = nil
-    @State private var transactionToEdit: Transaction?
-    @State private var incomeTargetTransaction: Transaction?
-    @State private var incomeToEdit: Income?
-    @State private var showDatePicker = false
-    
-    // 3. 筛选状态
-    @State private var selectedDate = Date()
-    @State private var showAll = false // 是否显示全部
-    // 👇 2. 新增：控制趋势图弹窗
+    @State private var viewModel : BillHomeViewModel
+
     @Query var cards: [CreditCard]
-    @State private var showTrendSheet = false   // 控制“返现”弹窗
-    @State private var showExpenseSheet = false // 👈 新增：控制“支出”弹窗
-    // 👇 新增：导入相关状态
-    @State private var showFileImporter = false
-    @State private var showImportAlert = false
-    @State private var importMessage = ""
-
-    // 👇👇👇 补回缺失的状态：是否按整年筛选
-    @State private var isWholeYear = false
-    @State private var selectedCategory: Category? = nil
-    @State private var showIncomeOnly = false
-
-    // 4. 汇率表
-    @State private var exchangeRates: [String: Double] = [:]
+    init(repository: TransactionRepositoryProtocol) {
+        // 使用 _变量名 来初始化 @State 属性
+        self._viewModel = State(initialValue: BillHomeViewModel(repository: repository))
+    }
+    // --- 2. ViewModel 与 持久化配置 ---
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
-    // 5. 核心筛选逻辑 (升级版)
-    var filteredTransactions: [Transaction] {
-        var results = showAll ? dbTransactions : dbTransactions.filter { t in
-            if isWholeYear {
-                // 👉 按“年”筛选 (只要年份相同)
-                return Calendar.current.isDate(t.date, equalTo: selectedDate, toGranularity: .year)
-            } else {
-                // 👉 按“月”筛选 (年份和月份都相同)
-                return Calendar.current.isDate(t.date, equalTo: selectedDate, toGranularity: .month)
-            }
-        }
-
-        if let category = selectedCategory {
-            results = results.filter { $0.category == category }
-        }
-
-        if showIncomeOnly {
-            results = results.filter { ($0.incomes?.isEmpty == false) }
-        }
-
-        return results
-    }
-    
-    // 辅助：按钮显示的文字
-    var dateButtonText: String {
-        if isWholeYear {
-            // 显示 "2025年 全年"
-            return selectedDate.formatted(.dateTime.year()) + " 全年"
-        } else {
-            // 显示 "2025年 11月"
-            return selectedDate.formatted(.dateTime.year().month())
-        }
-    }
-    
-    // 计算总支出（已扣除收入）
-    var totalExpense: Double {
-        if exchangeRates.isEmpty { return 0.0 }
-        return filteredTransactions.reduce(0) { total, t in
-            let code = t.card?.issueRegion.currencyCode ?? "CNY"
-            let rate = exchangeRates[code] ?? 1.0
-            let incomerate = exchangeRates[mainCurrencyCode] ?? 1.0
-
-            let expenseInMain = t.billingAmount / rate
-
-            // 如果你的 Income 金额字段不是 `amount`，把这里改成你实际的字段名
-            let incomeInMain = (t.incomes ?? []).reduce(0) { partial, income in
-                partial + (income.amount / incomerate)
-            }
-
-            return total + (expenseInMain - incomeInMain)
-        }
-    }
-    
-    // 计算总返现
-    var totalCashback: Double {
-        if exchangeRates.isEmpty { return 0.0 }
-        return filteredTransactions.reduce(0) { total, t in
-            let cb = CashbackService.calculateCashback(for: t)
-            let code = t.card?.issueRegion.currencyCode ?? "CNY"
-            let rate = exchangeRates[code] ?? 1.0
-            return total + (cb / rate)
-        }
-    }
     
     var body: some View {
         NavigationView {
@@ -110,292 +29,227 @@ struct BillHomeView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
+                        // 1. 顶部统计卡片
+                        statisticsHeader
                         
-                        // 1. 统计条 (标题动态变化)
-                        HStack(spacing: 15) {
-                            Button(action: {
-                                showExpenseSheet = true // 点击触发支出弹窗
-                            }) {
-                                StatBox(
-                                    title: showAll ? "总支出" : (isWholeYear ? "本年支出" : "本月支出"),
-                                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalExpense),
-                                    icon: "arrow.down.circle.fill", color: .red
-                                )
-                                .overlay(
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.gray.opacity(0.5))
-                                        .padding(.trailing, 10),
-                                    alignment: .trailing
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            // 👇 3. 修改：给“总返现” StatBox 包裹一个 Button
-                            Button(action: {
-                                showTrendSheet = true // 点击触发弹窗
-                            }) {
-                                StatBox(
-                                    title: showAll ? "总返现" : (isWholeYear ? "本年返现" : "本月返现"),
-                                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalCashback),
-                                    icon: "arrow.up.circle.fill", color: .green
-                                )
-                                // 添加一个小箭头暗示可以点击 (可选)
-                                .overlay(
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.gray.opacity(0.5))
-                                        .padding(.trailing, 10),
-                                    alignment: .trailing
-                                )
-                            }
-                            .buttonStyle(.plain) // 去掉按钮默认的点击变灰效果，保持 StatBox 原样
-                        }
-                        .padding(.horizontal).padding(.top)
+                        // 2. 筛选控制栏
+                        filterControlBar
                         
-                        // 2. 控制栏
-                        HStack {
-                            
-                            HStack(spacing: 10) {
-                                Spacer()
-                                Menu {
-                                    Button(action: { selectedCategory = nil }) {
-                                        Label("全部种类", systemImage: "checkmark.circle")
-                                    }
-
-                                    ForEach(Category.allCases, id: \.self) { category in
-                                        Button(action: { selectedCategory = category }) {
-                                            Label(category.displayName, systemImage: category.iconName)
-                                        }
-                                    }
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: selectedCategory?.iconName ?? "line.3.horizontal.decrease.circle")
-                                        Text(selectedCategory?.displayName ?? "全部种类")
-                                    }
-                                    .font(.subheadline)
-                                    .padding(.horizontal, 10).padding(.vertical, 5)
-                                    .background(selectedCategory == nil ? Color.clear : Color.blue)
-                                    .foregroundColor(selectedCategory == nil ? .blue : .white)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue, lineWidth: 1))
-                                }
-
-                                Button(action: { showIncomeOnly.toggle() }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "tray.and.arrow.down.fill")
-                                        Text("收入单")
-                                    }
-                                    .font(.subheadline)
-                                    .padding(.horizontal, 10).padding(.vertical, 5)
-                                    .background(showIncomeOnly ? Color.blue : Color.clear)
-                                    .foregroundColor(showIncomeOnly ? .white : .blue)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue, lineWidth: 1))
-                                }
-
-                                // "选择日期" 按钮
-                                Button(action: { showDatePicker = true }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "calendar")
-                                        Text(dateButtonText) // 👈 使用动态文字
-                                    }
-                                    .font(.subheadline)
-                                    .padding(.horizontal, 10).padding(.vertical, 5)
-                                    .background(showAll ? Color.clear : Color.blue)
-                                    .foregroundColor(showAll ? .blue : .white)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue, lineWidth: 1))
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                        // 3. 列表
-                        LazyVStack(spacing: 15) {
-                            ForEach(filteredTransactions) { item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    TransactionRow(transaction: item, exchangeRates: exchangeRates)
-                                        .onTapGesture { selectedTransaction = item }
-                                        .contextMenu {
-                                            Button { transactionToEdit = item } label: { Label("编辑", systemImage: "pencil") }
-                                            Button { incomeTargetTransaction = item } label: { Label("添加收入", systemImage: "plus.rectangle.on.rectangle") }
-                                            Divider() // 分割线，把危险操作隔开
-                                            Button(role: .destructive) { context.delete(item) } label: { Label("删除", systemImage: "trash") }
-                                        }
-                                    
-                                    
-                                    if let incomes = item.incomes, !incomes.isEmpty {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            ForEach(incomes.sorted(by: { $0.date > $1.date })) { income in
-                                                IncomeRow(income: income)
-                                                    .contextMenu {
-                                                        Button {
-                                                            incomeToEdit = income
-                                                        } label: {
-                                                            Label("编辑收入", systemImage: "pencil")
-                                                        }
-                                                        Button(role: .destructive) {
-                                                            context.delete(income)
-                                                            try? context.save()
-                                                        } label: {
-                                                            Label("删除", systemImage: "trash")
-                                                        }
-                                                    }
-                                            }
-                                        }
-                                        .padding(.leading, 30)
-                                    }
-                                }
-                            }
-                            
-                            if filteredTransactions.isEmpty {
-                                ContentUnavailableView(
-                                    "暂无账单",
-                                    systemImage: "list.bullet.clipboard",
-                                    description: Text("该时间段内没有交易记录")
-                                )
-                                .padding(.top, 40)
-                            }
-                        }
-                        .padding(.horizontal)
+                        // 3. 交易账单列表
+                        transactionListView
                     }
                 }
             }
             .navigationTitle("Cashback Counter")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        // 1. 导出选项
-                        if !filteredTransactions.isEmpty,
-                           let receiptsZipURL = filteredTransactions.exportReceiptsZip() {
-                                ShareLink(items: [receiptsZipURL]) {
-                                    Label("导出账单", systemImage: "square.and.arrow.up")
-                                }
-                            }
-                        
-                                                
-                        // 2. 导入选项
-                        Button {
-                            showFileImporter = true
-                        } label: {
-                            Label("导入账单", systemImage: "square.and.arrow.down")
-                        }
-                        
-                    } label: {
-                        // 外显图标：用圆圈三点或者之前的图标
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 18))
-                        // .foregroundColor(.blue)
-                    }
-                }
-            }
-            .fileImporter(
-                isPresented: $showFileImporter,
-                allowedContentTypes: [.commaSeparatedText, .zip], // 兼容 .csv
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    // 安全访问
-                    guard url.startAccessingSecurityScopedResource() else { return }
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    
-                    do {
-                        // 👇 判断文件类型
-                        if url.pathExtension.lowercased() == "zip" {
-                            // 调用 ZIP 导入 (包含收据)
-                            try CSVHelper.importBackupZip(url: url, context: context, allCards: cards)
-                            importMessage = "ZIP 备份导入成功！"
-                        } else {
-                            // 调用普通 CSV 导入 (无收据)
-                            let content = try String(contentsOf: url, encoding: .utf8)
-                            _ = try CSVHelper.parseTransactionCSV(content: content, context: context, allCards: cards)
-                            importMessage = "CSV 导入成功！"
-                        }
-                        
-                        showImportAlert = true
-                    } catch {
-                        importMessage = "导入失败：\(error.localizedDescription)"
-                        showImportAlert = true
-                    }
-                case .failure(let error):
-                    print("选择文件失败: \(error)")
-                }
-            }
-            // 结果提示框
-            .alert("导入结果", isPresented: $showImportAlert) {
-                Button("确定", role: .cancel) { }
-            } message: {
-                Text(importMessage)
-            }
-        
-            // 弹窗绑定
-            .sheet(item: $selectedTransaction) { item in
+            .toolbar { toolbarContent }
+            
+            // --- 弹窗与交互绑定 ---
+            .sheet(item: $viewModel.selectedTransaction) { item in
                 TransactionDetailView(transaction: item).presentationDetents([.large])
             }
-            .sheet(item: $incomeTargetTransaction) { transaction in
+            .sheet(item: $viewModel.transactionToEdit) { item in
+                AddTransactionView(repository: viewModel.repository, transaction: item)
+            }
+            .sheet(item: $viewModel.incomeTargetTransaction) { transaction in
                 AddIncomeView(transaction: transaction)
             }
-            .sheet(item: $incomeToEdit) { income in
+            .sheet(item: $viewModel.incomeToEdit) { income in
                 EditIncomeView(income: income)
             }
-            .sheet(item: $transactionToEdit) { item in
-                AddTransactionView(transaction: item)
-            }
-            // 👇👇👇 修复：绑定 MonthYearPicker 并传入 isWholeYear
-            .sheet(isPresented: $showDatePicker) {
-                MonthYearPicker(date: $selectedDate, isWholeYear: $isWholeYear)
+            .sheet(isPresented: $viewModel.showDatePicker) {
+                MonthYearPicker(date: $viewModel.selectedDate, isWholeYear: $viewModel.isWholeYear)
                     .presentationDetents([.height(300)])
-                    .onDisappear { withAnimation { showAll = false } }
+                    .onDisappear { withAnimation { viewModel.showAll = false } }
             }
-            .sheet(isPresented: $showTrendSheet) {
-                TrendAnalysisView(
-                    transactions: dbTransactions,
-                    cards: cards,
-                    exchangeRates: exchangeRates,
-                    type: .cashback // 👈 指定为返现模式 (绿色)
-                )
-                .presentationDetents([.large, .large])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $viewModel.showTrendSheet) {
+                TrendAnalysisView(transactions: dbTransactions, exchangeRates: viewModel.exchangeRates, type: .cashback)
+                    .presentationDetents([.large])
             }
-
-            // 👇 2. 新增：支出分析弹窗
-            .sheet(isPresented: $showExpenseSheet) {
-                TrendAnalysisView(
-                    transactions: dbTransactions,
-                    cards: cards,
-                    exchangeRates: exchangeRates,
-                    type: .expense // 👈 指定为支出模式 (红色)
-                )
-                .presentationDetents([.large, .large])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $viewModel.showExpenseSheet) {
+                TrendAnalysisView(transactions: dbTransactions, exchangeRates: viewModel.exchangeRates, type: .expense)
+                    .presentationDetents([.large])
+            }
+            
+            // --- 导入功能绑定 ---
+            .fileImporter(
+                isPresented: $viewModel.showFileImporter,
+                allowedContentTypes: [.commaSeparatedText, .zip],
+                allowsMultipleSelection: false
+            ) { result in
+                viewModel.handleImport(result: result, context: context, cards: cards)
+            }
+            .alert("导入结果", isPresented: $viewModel.showImportAlert) {
+                Button("确定", role: .cancel) { }
+            } message: {
+                Text(viewModel.importMessage)
             }
         }
         .task {
-            do {
-                let rates = await CurrencyService.getRates(base: mainCurrencyCode)
-                await MainActor.run { self.exchangeRates = rates }
-            } catch { print("汇率获取失败") }
+            viewModel.mainCurrencyCode = mainCurrencyCode
+            await viewModel.updateRates()
         }
-        .onChange(of: mainCurrencyCode) { newCode in
-            Task {
-                do {
-                    let rates = await CurrencyService.getRates(base: newCode)
-                    await MainActor.run { self.exchangeRates = rates }
-                } catch {
-                    print("汇率获取失败：\(error)")
-                }
-            }
+        .onChange(of: mainCurrencyCode) { _, newCode in
+            viewModel.mainCurrencyCode = newCode
+            Task { await viewModel.updateRates() }
         }
         .onAppear {
-            do {
-                try CardTemplate.syncDefaultTemplates(in: context)
-                try CardTemplate.refreshCardsFromTemplates(in: context)
-            } catch {
-                print("Failed to sync card templates: \(error)")
+            viewModel.syncTemplates(context: context)
+        }
+    }
+}
+
+// MARK: - UI 子组件 (Helper Methods)
+extension BillHomeView {
+    
+    /// 统计概览区域
+    private var statisticsHeader: some View {
+        let filtered = viewModel.filteredTransactions(dbTransactions)
+        let isDataLoading = viewModel.exchangeRates.isEmpty
+        
+        return HStack(spacing: 12) {
+            // 支出卡片
+            StatBox(
+                title: viewModel.isWholeYear ? "本年支出" : "本月支出",
+                amount: String(format: "%.2f", viewModel.calculateTotalExpense(for: filtered)),
+                icon: "arrow.down.right.circle.fill",
+                color: .red,
+                isLoading: isDataLoading
+            )
+            .onTapGesture { viewModel.showExpenseSheet = true }
+
+            // 返现卡片
+            StatBox(
+                title: viewModel.isWholeYear ? "本年返现" : "本月返现",
+                amount: String(format: "%.2f", viewModel.calculateTotalCashback(for: filtered)),
+                icon: "arrow.up.left.circle.fill",
+                color: .green,
+                isLoading: isDataLoading
+            )
+            .onTapGesture { viewModel.showTrendSheet = true }
+        }
+        .padding(.horizontal)
+    }
+
+    /// 筛选控制工具栏
+    private var filterControlBar: some View {
+        HStack(spacing: 10) {
+            Spacer()
+            
+            // 类别筛选菜单
+            Menu {
+                Button(action: { viewModel.selectedCategory = nil }) {
+                    Label("全部种类", systemImage: "checkmark.circle")
+                }
+                ForEach(Category.allCases, id: \.self) { category in
+                    Button(action: { viewModel.selectedCategory = category }) {
+                        Label(category.displayName, systemImage: category.iconName)
+                    }
+                }
+            } label: {
+                FilterTag(
+                    icon: viewModel.selectedCategory?.iconName ?? "line.3.horizontal.decrease.circle",
+                    text: viewModel.selectedCategory?.displayName ?? "全部种类",
+                    isSelected: viewModel.selectedCategory != nil
+                )
+            }
+
+            // 仅看收入切换
+            Button(action: { viewModel.showIncomeOnly.toggle() }) {
+                FilterTag(icon: "tray.and.arrow.down.fill", text: "收入单", isSelected: viewModel.showIncomeOnly)
+            }
+
+            // 日期切换按钮
+            Button(action: { viewModel.showDatePicker = true }) {
+                FilterTag(icon: "calendar", text: viewModel.dateButtonText, isSelected: !viewModel.showAll, activeColor: .blue)
             }
         }
+        .padding(.horizontal)
+    }
+
+    /// 核心账单列表
+    private var transactionListView: some View {
+        let filtered = viewModel.filteredTransactions(dbTransactions)
+        return LazyVStack(spacing: 15) {
+            ForEach(filtered) { item in
+                VStack(alignment: .leading, spacing: 8) {
+                    TransactionRow(transaction: item, exchangeRates: viewModel.exchangeRates)
+                        .onTapGesture { viewModel.selectedTransaction = item }
+                        .contextMenu {
+                            Button { viewModel.transactionToEdit = item } label: { Label("编辑", systemImage: "pencil") }
+                            Button { viewModel.incomeTargetTransaction = item } label: { Label("添加收入", systemImage: "plus.rectangle.on.rectangle") }
+                            Divider()
+                            Button(role: .destructive) { context.delete(item) } label: { Label("删除", systemImage: "trash") }
+                        }
+                    
+                    // 渲染关联的收入
+                    if let incomes = item.incomes, !incomes.isEmpty {
+                        ForEach(incomes.sorted(by: { $0.date > $1.date })) { income in
+                            IncomeRow(income: income)
+                                .padding(.leading, 30)
+                                .contextMenu {
+                                    Button { viewModel.incomeToEdit = income } label: { Label("编辑收入", systemImage: "pencil") }
+                                    Button(role: .destructive) { context.delete(income) } label: { Label("删除", systemImage: "trash") }
+                                }
+                        }
+                    }
+                }
+            }
+            
+            if filtered.isEmpty {
+                ContentUnavailableView("暂无账单", systemImage: "list.bullet.clipboard", description: Text("该时间段内没有交易记录"))
+                    .padding(.top, 40)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    /// 导航栏工具
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                // 导出功能
+                if !dbTransactions.isEmpty, let zipURL = dbTransactions.exportReceiptsZip() {
+                    ShareLink(items: [zipURL]) {
+                        Label("导出账单", systemImage: "square.and.arrow.up")
+                    }
+                }
+                // 导入功能
+                Button { viewModel.showFileImporter = true } label: {
+                    Label("导入账单", systemImage: "square.and.arrow.down")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle").font(.system(size: 18))
+            }
+        }
+    }
+
+    private var chevronIcon: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption)
+            .foregroundColor(.gray.opacity(0.5))
+            .padding(.trailing, 10)
+    }
+}
+
+/// 辅助小视图：筛选标签
+struct FilterTag: View {
+    let icon: String
+    let text: String
+    let isSelected: Bool
+    var activeColor: Color = .blue
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(isSelected ? activeColor : Color.clear)
+        .foregroundColor(isSelected ? .white : activeColor)
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(activeColor, lineWidth: 1))
     }
 }

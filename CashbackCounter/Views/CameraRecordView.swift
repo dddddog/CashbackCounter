@@ -10,7 +10,10 @@ import SwiftUI
 struct CameraRecordView: View {
     // 1. 引入刚才写的相机引擎
     @StateObject var cameraService = CameraService()
-    
+    let repository: TransactionRepositoryProtocol
+    init(repository: TransactionRepositoryProtocol) {
+        self.repository = repository
+    }
     // 2. 控制跳转
     @State private var showAddSheet = false      // 跳转去记账页
     @State private var showPhotoLibrary = false  // 打开相册
@@ -137,9 +140,9 @@ struct CameraRecordView: View {
         // 弹窗 2：去记账页面 (带上图片！)
         .sheet(isPresented: $showAddSheet) {
             // 👇 记得这里要清空 selectedImage，防止下次回来还有值
-            AddTransactionView(image: selectedImage, onSaved: {
-                 // 保存成功后的回调
-            })
+            AddTransactionView(repository: repository, image: selectedImage) {
+                selectedImage = nil // 保存成功后的回调
+            }
             .onDisappear {
                 selectedImage = nil
                 cameraService.recentImage = nil

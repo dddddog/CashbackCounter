@@ -65,3 +65,16 @@ class Transaction: Identifiable {
             return formatter.string(from: date)
         }
 }
+// Transaction.swift
+
+extension Transaction {
+    // 提供一个标准的金额显示接口
+    var displayBillingAmount: String {
+        String(format: "%.2f", billingAmount)
+    }
+    
+    // 把币种逻辑封装起来
+    var currencySymbol: String {
+        card?.issueRegion.currencySymbol ?? location.currencySymbol
+    }
+}
