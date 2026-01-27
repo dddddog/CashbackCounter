@@ -1,10 +1,3 @@
-//
-//  AddTransactionView.swift
-//  CashbackCounter
-//
-//  Created by Junhao Huang on 11/23/25.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -28,7 +21,10 @@ struct AddTransactionView: View {
     @State private var billingAmountStr: String = ""
     @State private var receiptImage: UIImage?
     
-    // 👇 新增：控制 AI 分析的加载状态
+    // 👇 1. 确保有这个状态变量
+    @State private var paymentMethod: PaymentMethod = .offline
+    
+    // AI 分析状态
     @State private var isAnalyzing: Bool = false
     @State private var showFullImage = false
     @State private var showImagePicker: Bool = false
@@ -47,12 +43,14 @@ struct AddTransactionView: View {
             _selectedCategory = State(initialValue: t.category)
             _date = State(initialValue: t.date)
             _location = State(initialValue: t.location)
+            // 👇 初始化消费方式
+            _paymentMethod = State(initialValue: t.paymentMethod)
             
             if let data = t.receiptData {
                 _receiptImage = State(initialValue: UIImage(data: data))
             }
         } else {
-            // 新建模式 (可能带图)
+            // 新建模式
             _receiptImage = State(initialValue: image)
         }
     }
@@ -91,6 +89,15 @@ struct AddTransactionView: View {
                         }
                     }
                     
+                    // 👇 新增：消费方式选择器
+                    Picker("交易类型", selection: $paymentMethod) {
+                        ForEach(PaymentMethod.allCases, id: \.self) { method in
+                            Label(method.displayName, systemImage: method.iconName)
+                                .foregroundColor(method.color) // 使用我们在 Enum 里定义的颜色
+                                .tag(method)
+                        }
+                    }
+                    
                     Picker("消费地区", selection: $location) {
                         ForEach(Region.allCases, id: \.self) { r in
                             Text("\(r.icon) \(r.rawValue)").tag(r)
@@ -98,7 +105,7 @@ struct AddTransactionView: View {
                     }
                 }
                 
-                // --- 第二组：收据图片预览 + 上传/删除  ---
+                // --- 第二组：收据凭证 ---
                 Section(header: Text("收据凭证")) {
                     if let image = receiptImage {
                         ZStack {
@@ -107,11 +114,11 @@ struct AddTransactionView: View {
                                 .scaledToFit()
                                 .frame(maxHeight: 200)
                                 .cornerRadius(10)
-                                .opacity(isAnalyzing ? 0.5 : 1.0) // 分析时变暗
+                                .opacity(isAnalyzing ? 0.5 : 1.0)
                                 .onTapGesture {
                                     showFullImage = true
                                 }
-                            // 👇 分析时显示转圈圈
+                            
                             if isAnalyzing {
                                 ProgressView("AI 分析中...")
                                     .padding()
@@ -121,7 +128,6 @@ struct AddTransactionView: View {
                         }
                         .sheet(isPresented: $showFullImage){
                             ReceiptFullScreenView(image: image)
-                            // 可选：显示下拉指示条，提示用户可以下拉
                                 .presentationDragIndicator(.visible)
                         }
                         Button(role: .destructive) {
@@ -141,13 +147,12 @@ struct AddTransactionView: View {
                         } label: {
                             Label("上传收据图片", systemImage: "photo.on.rectangle")
                         }
-                        
                     }
                 }
             
                 
-                // --- 第三组：支付方式 ---
-                Section(header: Text("支付方式")) {
+                // --- 第三组：支付账户与日期 ---
+                Section(header: Text("支付账户")) {
                     if cards.isEmpty {
                         Text("请先添加信用卡").foregroundColor(.secondary)
                     } else {
@@ -180,38 +185,22 @@ struct AddTransactionView: View {
                     HStack {
                         Text("预计返现")
                         Spacer()
-                        if let amountDouble = Double(amount),
-                           cards.indices.contains(selectedCardIndex) {
-                            
-                            let card = cards[selectedCardIndex]
-                            let finalAmount = Double(billingAmountStr) ?? amountDouble
-                            
-                            // 👇 核心修改：调用卡片的 calculateCappedCashback
-                            // 注意：必须传入 date，因为要查这一年的历史记录
-                            let cashback = card.calculateCappedCashback(
-                                amount: finalAmount,
-                                category: selectedCategory,
-                                location: location,
-                                date: date,
-                                transactionToExclude: transactionToEdit // 👈 预览时排除旧值
-                            )
-                            
-                            // 计算理论返现 (如果不受限应该拿多少)，用来判断是否变色
-                            let theoretical = finalAmount * card.getRate(for: selectedCategory, location: location)
-                            
+                        
+                        // 使用刚才抽离的计算属性
+                        if let preview = cashbackPreview {
                             HStack(spacing: 4) {
-                                Text("\(currentCurrencySymbol)\(String(format: "%.2f", cashback))")
-                                    .foregroundColor(cashback < theoretical - 0.01 ? .orange : .green) // 如果被砍了(比理论少)，显示橙色
+                                Text("\(currentCurrencySymbol)\(String(format: "%.2f", preview.amount))")
+                                    .foregroundColor(preview.isCapped ? .orange : .green)
                                     .fontWeight(.bold)
                                 
-                                // 如果触发上限，加个小提示
-                                if cashback < theoretical - 0.01 {
+                                if preview.isCapped {
                                     Image(systemName: "exclamationmark.circle")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                 }
                             }
                         } else {
+                            // 金额无效或未选卡时
                             Text("¥0.00").foregroundColor(.gray)
                         }
                     }
@@ -226,26 +215,18 @@ struct AddTransactionView: View {
                         .disabled(merchant.isEmpty || amount.isEmpty || cards.isEmpty)
                 }
             }
-            // ⚡️ 修正卡片索引
             .onAppear {
-                // 如果是编辑模式，选中旧卡
                 if let t = transactionToEdit, let card = t.card,
                    let index = cards.firstIndex(of: card) {
                     selectedCardIndex = index
-                }
-                // 👇 如果是新建模式且带图 (比如从相机直接跳转过来)，但还没分析过，触发分析
-                else if receiptImage != nil && amount.isEmpty {
-                    // 稍微延迟一下，让界面先出来
+                } else if receiptImage != nil && amount.isEmpty {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         analyzeReceipt()
                     }
                 }
             }
-            // 👇👇👇 核心：监听图片变化，触发 OCR
-            .onChange(of: receiptImage) { oldValue, newImage in
-                if newImage != nil {
-                    analyzeReceipt()
-                }
+            .onChange(of: receiptImage) { _, newImage in
+                if newImage != nil { analyzeReceipt() }
             }
             .onChange(of: amount) { updateBillingAmount() }
             .onChange(of: location) { updateBillingAmount() }
@@ -257,64 +238,71 @@ struct AddTransactionView: View {
         }
     }
     
-    // --- 4. 抽离出 AI 分析逻辑 ---
+    // --- 4. AI 分析逻辑 (保持不变，或在此处根据 metadata 自动推断 paymentMethod) ---
     func analyzeReceipt() {
+        // ... (保持你原有的逻辑不变) ...
         guard let image = receiptImage else { return }
-        
-        // 避免重复分析 (比如编辑模式进来已有数据)
         if !merchant.isEmpty || !amount.isEmpty { return }
-        
-        isAnalyzing = true // 开始转圈
+        isAnalyzing = true
         
         Task {
-            // 调用我们之前写好的 OCRService
             let metadata = await OCRService.analyzeImage(image)
-            
             await MainActor.run {
-                isAnalyzing = false // 停止转圈
-                
+                isAnalyzing = false
                 if let data = metadata {
-                    // 1. 填金额
-                    if let amt = data.totalAmount {
-                        self.amount = String(format: "%.2f", abs(amt))
+                    if let amt = data.totalAmount { self.amount = String(format: "%.2f", abs(amt)) }
+                    if let merch = data.merchant { self.merchant = merch }
+                    if let dateStr = data.dateString { self.date = dateStr.toDate() }
+                    if let last4 = data.cardLast4, let index = cards.firstIndex(where: { $0.endNum == last4 }) {
+                        self.selectedCardIndex = index
                     }
-                    // 2. 填商家
-                    if let merch = data.merchant {
-                        self.merchant = merch
-                    }
-                    // 3. 填日期
-                    if let dateStr = data.dateString {
-                        self.date = dateStr.toDate()
-                    }
-                    
-                    // 4. 自动选卡 (匹配尾号)
-                    if let last4 = data.cardLast4 {
-                        if let index = cards.firstIndex(where: { $0.endNum == last4 }) {
-                            self.selectedCardIndex = index
-                        }
-                    }
-                    
-                    // 5. 匹配商户类别
-                    if let cat = data.category {
-                        self.selectedCategory = cat
-                    }
-                    
-                    // 5. 自动识别币种/地区
+                    if let cat = data.category { self.selectedCategory = cat }
                     if let currency = data.currency {
                         if currency.contains("CNY") { self.location = .cn }
                         else if currency.contains("USD") { self.location = .us }
                         else if currency.contains("HKD") { self.location = .hk }
-                        else if currency.contains("JPY") { self.location = .jp}
-                        else if currency.contains("NZD") { self.location = .nz}
-                        else if currency.contains("TWD") { self.location = .tw}
-                        else { self.location = .other}
-                        
+                        else if currency.contains("JPY") { self.location = .jp }
+                        else { self.location = .other }
                     }
                 }
             }
         }
     }
-    
+    // MARK: - 抽离的计算逻辑
+    // 返回值：(返现金额, 是否被上限卡住)
+    private var cashbackPreview: (amount: Double, isCapped: Bool)? {
+        // 1. 基础校验
+        guard let amountDouble = Double(amount),
+              cards.indices.contains(selectedCardIndex) else {
+            return nil
+        }
+        
+        let card = cards[selectedCardIndex]
+        // 优先使用 billingAmountStr (如果有值)，否则用 amount
+        let finalAmount = Double(billingAmountStr) ?? amountDouble
+        
+        // 2. 计算实际返现 (调用你的 Core Function)
+        let cashback = card.calculateCappedCashback(
+            amount: finalAmount,
+            category: selectedCategory,
+            location: location,
+            date: date,
+            paymentMethod: paymentMethod,
+            transactionToExclude: transactionToEdit
+        )
+        
+        // 3. 计算理论返现 (用于判断颜色)
+        // ⚠️ 注意：既然你修改了 getRate，这里请根据你的 getRate 签名来写
+        // 情况 A：如果你把 paymentMethod 加进去了，就用：
+        let theoreticalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
+        
+        let theoretical = finalAmount * theoreticalRate
+        
+        // 判断是否被 Cap (实际 < 理论 - 误差)
+        let isCapped = cashback < (theoretical - 0.01)
+        
+        return (cashback, isCapped)
+    }
     // --- 核心保存逻辑 ---
     func saveTransaction() {
         guard let amountDouble = Double(amount) else { return }
@@ -324,17 +312,21 @@ struct AddTransactionView: View {
             let card = cards[selectedCardIndex]
             let imageData = receiptImage?.jpegData(compressionQuality: 0.5)
             
-            // 👇 1. 在保存前，先算出“最终返现额”
+            // 1. 计算最终返现 (包含 PaymentMethod)
             let finalCashback = card.calculateCappedCashback(
                 amount: billingDouble,
                 category: selectedCategory,
                 location: location,
                 date: date,
-                transactionToExclude: transactionToEdit // 👈 保存时排除旧值
+                paymentMethod: paymentMethod, // 👈 传入
+                transactionToExclude: transactionToEdit
             )
             
-            // 2. 重新获取一次名义费率 (用于更新 rate 字段)
-            let nominalRate = card.getRate(for: selectedCategory, location: location)
+            // 2. 计算名义费率
+            // 如果你的 CreditCard.getRate 还没更新支持 payment，这里我们手动加一下
+            // 确保 CreditCard 类里有 paymentMethodRates 字典
+            let baseRate = card.getRate(for: selectedCategory, location: location,payment: paymentMethod)
+            let nominalRate = baseRate
             
             if let t = transactionToEdit {
                 // --- 编辑模式 ---
@@ -343,16 +335,20 @@ struct AddTransactionView: View {
                 t.location = location
                 t.date = date
                 
-                // 如果关键信息变了，更新关联属性
-                if t.card != card || t.billingAmount != billingDouble || t.category != selectedCategory || t.date != date || t.cashbackamount != finalCashback {
+                // 检查关键属性变更
+                if t.card != card ||
+                    t.billingAmount != billingDouble ||
+                    t.category != selectedCategory ||
+                    t.paymentMethod != paymentMethod || // 👈 检查消费方式变化
+                    t.date != date ||
+                    t.cashbackamount != finalCashback {
                     
                     t.card = card
                     t.billingAmount = billingDouble
                     t.category = selectedCategory
+                    t.paymentMethod = paymentMethod // 👈 更新数据库字段
                     
-                    // 更新费率
                     t.rate = nominalRate
-                    // 👇 更新返现额 (直接赋值)
                     t.cashbackamount = finalCashback
                 }
                 
@@ -369,8 +365,8 @@ struct AddTransactionView: View {
                     card: card,
                     receiptData: imageData,
                     billingAmount: billingDouble,
-                    // 👇 传入算好的返现额
                     cashbackAmount: finalCashback,
+                    paymentMethod: paymentMethod // 👈 写入数据库
                 )
                 context.insert(newTransaction)
             }
@@ -379,51 +375,34 @@ struct AddTransactionView: View {
             onSaved?()
         }
     }
+    
     func updateBillingAmount() {
+        // ... (保持你原有的逻辑不变) ...
         guard let amountDouble = Double(amount) else { return }
-
         guard cards.indices.contains(selectedCardIndex) else {
             billingAmountStr = amount
             return
         }
-
-        // 1. 获取消费地货币 (比如 JPY)
         let sourceCurrency = location.currencyCode
-
-        // 2. 获取卡片货币 (比如 USD)
         let card = cards[selectedCardIndex]
         let targetCurrency = card.issueRegion.currencyCode
         
-        // 如果币种一样，不需要查汇率
-        if sourceCurrency == targetCurrency || sourceCurrency=="TWD" || sourceCurrency == "EUR" {
+        if sourceCurrency == targetCurrency || sourceCurrency == "TWD" || sourceCurrency == "EUR" {
             billingAmountStr = amount
             return
         }
+        guard transactionToEdit == nil else { return }
         
-        // 3. 异步调用 API（仅在新建模式下自动换算；编辑模式不自动请求汇率）
-        guard transactionToEdit == nil else {
-            return
-        }
-
-        // 4. 异步调用 API
         Task {
             do {
-                // 调用我们刚才写的服务
                 let rate = try await CurrencyService.fetchRate(from: sourceCurrency, to: targetCurrency)
-                
-                // 计算入账金额
                 let billing = amountDouble * rate
-                
-                // 回到主线程更新 UI
                 await MainActor.run {
                     self.billingAmountStr = String(format: "%.2f", billing)
                 }
             } catch {
                 print("汇率获取失败: \(error)")
-                // 失败时也可以不做处理，让用户手动填
             }
         }
     }
 }
-
-

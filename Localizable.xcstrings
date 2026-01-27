@@ -501,6 +501,9 @@
         }
       }
     },
+    "交易类型" : {
+
+    },
     "人民币 (CNY)" : {
       "localizations" : {
         "en" : {
@@ -1548,6 +1551,7 @@
       }
     },
     "支付方式" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1568,6 +1572,9 @@
           }
         }
       }
+    },
+    "支付账户" : {
+
     },
     "支出" : {
       "localizations" : {
