@@ -15,6 +15,7 @@
 
     },
     "- %@%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -35,6 +36,12 @@
           }
         }
       }
+    },
+    "-%@" : {
+
+    },
+    "(%@)" : {
+
     },
     "**** **** **** %@" : {
       "localizations" : {
@@ -57,6 +64,9 @@
           }
         }
       }
+    },
+    "%" : {
+
     },
     "%@ %@" : {
       "localizations" : {
@@ -123,6 +133,9 @@
           }
         }
       }
+    },
+    "+%@" : {
+
     },
     "¥0.00" : {
       "localizations" : {
@@ -431,6 +444,9 @@
         }
       }
     },
+    "上限:" : {
+
+    },
     "主货币" : {
       "localizations" : {
         "en" : {
@@ -502,6 +518,9 @@
       }
     },
     "交易类型" : {
+
+    },
+    "交易详情" : {
 
     },
     "人民币 (CNY)" : {
@@ -595,6 +614,9 @@
           }
         }
       }
+    },
+    "入账金额" : {
+
     },
     "入账金额 (%@)" : {
       "localizations" : {
@@ -754,6 +776,9 @@
         }
       }
     },
+    "凭证" : {
+
+    },
     "分析" : {
       "localizations" : {
         "en" : {
@@ -829,6 +854,12 @@
           }
         }
       }
+    },
+    "删除此交易" : {
+
+    },
+    "加成:" : {
+
     },
     "加成%" : {
       "localizations" : {
@@ -1111,6 +1142,7 @@
       }
     },
     "完成" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1346,6 +1378,9 @@
         }
       }
     },
+    "已抵扣/关联收入" : {
+
+    },
     "常规" : {
       "localizations" : {
         "en" : {
@@ -1550,8 +1585,10 @@
         }
       }
     },
+    "支付卡片" : {
+
+    },
     "支付方式" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1572,6 +1609,12 @@
           }
         }
       }
+    },
+    "支付方式规则 (可选)" : {
+
+    },
+    "支付详情" : {
+
     },
     "支付账户" : {
 
@@ -1619,6 +1662,7 @@
       }
     },
     "收入单" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1754,6 +1798,9 @@
         }
       }
     },
+    "无收据图片" : {
+
+    },
     "日" : {
       "localizations" : {
         "en" : {
@@ -1863,6 +1910,7 @@
       }
     },
     "本单返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2039,6 +2087,9 @@
           }
         }
       }
+    },
+    "汇率约 %@" : {
+
     },
     "浅色模式" : {
       "localizations" : {
@@ -2325,6 +2376,7 @@
       }
     },
     "电子收据" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2683,6 +2735,7 @@
       }
     },
     "该时间段内没有交易记录" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2703,6 +2756,9 @@
           }
         }
       }
+    },
+    "该筛选条件下没有交易记录" : {
+
     },
     "语言设置" : {
       "localizations" : {
@@ -2881,6 +2937,9 @@
           }
         }
       }
+    },
+    "返现分析" : {
+
     },
     "还款提醒" : {
       "localizations" : {

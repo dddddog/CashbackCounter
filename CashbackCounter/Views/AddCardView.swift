@@ -29,25 +29,33 @@ struct AddCardView: View {
     
     @State private var defaultRateStr: String
     @State private var foreignRateStr: String
+    
+    // 类别加成费率
     @State private var diningRateStr: String = ""
     @State private var groceryRateStr: String = ""
     @State private var travelRateStr: String = ""
     @State private var digitalRateStr: String = ""
     @State private var otherRateStr: String = ""
     
-    // 👇 新增：上限设置 (Cap) 变量
-    @State private var localBaseCapStr: String = ""   // 本币基础上限
-    @State private var foreignBaseCapStr: String = "" // 外币基础上限
+    // 基础上限
+    @State private var localBaseCapStr: String = ""
+    @State private var foreignBaseCapStr: String = ""
     
-    // 各个类别的加成上限
+    // 类别加成上限
     @State private var diningCapStr: String = ""
     @State private var groceryCapStr: String = ""
     @State private var travelCapStr: String = ""
     @State private var digitalCapStr: String = ""
     @State private var otherCapStr: String = ""
     
-    // 新增 State
+    // 还款日
     @State private var repaymentDayStr: String = ""
+    
+    // 👇👇👇 新增：支付方式 (Payment Method) 的状态变量
+    // 用于暂存 UI 上输入的加成 (单位：%, 比如 1.0)
+    @State private var paymentMethodRates: [PaymentMethod: Double]
+    // 用于暂存 UI 上输入的上限 (单位：金额)
+    @State private var paymentCaps: [PaymentMethod: Double]
     
     // --- 2. 核心：自定义初始化 ---
     init(template: CardTemplate? = nil, cardToEdit: CreditCard? = nil, onSaved: (() -> Void)? = nil) {
@@ -55,7 +63,7 @@ struct AddCardView: View {
         self.template = template
         self.onSaved = onSaved
         
-        // 逻辑 A: 如果是编辑模式 (cardToEdit 有值) -> 填充旧数据
+        // 逻辑 A: 编辑模式 -> 填充旧数据
         if let card = cardToEdit {
             _bankName = State(initialValue: card.bankName)
             _cardType = State(initialValue: card.type)
@@ -63,7 +71,7 @@ struct AddCardView: View {
             if card.repaymentDay > 0 {
                 _repaymentDayStr = State(initialValue: String(card.repaymentDay))
             }
-            // 颜色回填 (利用 computed property 直接拿 Color)
+            
             if card.colors.count >= 2 {
                 _color1 = State(initialValue: card.colors[0])
                 _color2 = State(initialValue: card.colors[1])
@@ -75,47 +83,44 @@ struct AddCardView: View {
             _region = State(initialValue: card.issueRegion)
             _capPeriod = State(initialValue: card.capPeriod)
             
-            // 费率回填 (注意：数据库存的是 0.01，界面显示要 *100 变成 "1.0")
+            // 费率回填
             _defaultRateStr = State(initialValue: String(card.defaultRate * 100))
-            
             if let foreignRate = card.foreignCurrencyRate {
                 _foreignRateStr = State(initialValue: String(foreignRate * 100))
             } else {
                 _foreignRateStr = State(initialValue: "")
             }
-            if let rate = card.specialRates[.dining] {
-                _diningRateStr = State(initialValue: String(rate * 100))
-            }
-            if let rate = card.specialRates[.grocery] {
-                _groceryRateStr = State(initialValue: String(rate * 100))
-            }
-            if let rate = card.specialRates[.travel] {
-                _travelRateStr = State(initialValue: String(rate * 100))
-            }
-            if let rate = card.specialRates[.digital] {
-                _digitalRateStr = State(initialValue: String(rate * 100))
-            }
-            if let rate = card.specialRates[.other] {
-                _otherRateStr = State(initialValue: String(rate * 100))
-            }
             
-            // 👇 新增：回填上限数据 (如果是 0 就不显示，留空代表无上限)
+            // 类别费率回填
+            if let rate = card.specialRates[.dining] { _diningRateStr = State(initialValue: String(rate * 100)) }
+            if let rate = card.specialRates[.grocery] { _groceryRateStr = State(initialValue: String(rate * 100)) }
+            if let rate = card.specialRates[.travel] { _travelRateStr = State(initialValue: String(rate * 100)) }
+            if let rate = card.specialRates[.digital] { _digitalRateStr = State(initialValue: String(rate * 100)) }
+            if let rate = card.specialRates[.other] { _otherRateStr = State(initialValue: String(rate * 100)) }
+            
+            // 基础上限回填
             if card.localBaseCap > 0 { _localBaseCapStr = State(initialValue: String(format: "%.0f", card.localBaseCap)) }
             if card.foreignBaseCap > 0 { _foreignBaseCapStr = State(initialValue: String(format: "%.0f", card.foreignBaseCap)) }
             
-            // 回填类别上限 (从字典取)
+            // 类别上限回填
             if let cap = card.categoryCaps[.dining], cap > 0 { _diningCapStr = State(initialValue: String(format: "%.0f", cap)) }
             if let cap = card.categoryCaps[.grocery], cap > 0 { _groceryCapStr = State(initialValue: String(format: "%.0f", cap)) }
             if let cap = card.categoryCaps[.travel], cap > 0 { _travelCapStr = State(initialValue: String(format: "%.0f", cap)) }
             if let cap = card.categoryCaps[.digital], cap > 0 { _digitalCapStr = State(initialValue: String(format: "%.0f", cap)) }
             if let cap = card.categoryCaps[.other], cap > 0 { _otherCapStr = State(initialValue: String(format: "%.0f", cap)) }
             
+            // 👇 新增：回填支付方式数据
+            // 注意：card 里的 rate 存的是 0.01，我们需要 * 100 变成 1.0 给 UI
+            let ratesForUI = card.paymentMethodRates.mapValues { $0 * 100 }
+            _paymentMethodRates = State(initialValue: ratesForUI)
+            _paymentCaps = State(initialValue: card.paymentCaps)
+            
         }
-        // 逻辑 B: 如果是模板模式 -> 填充模板数据 ***还没改
+        // 逻辑 B: 模板模式 -> 填充模板数据
         else if let template = template {
             _bankName = State(initialValue: template.bankName)
             _cardType = State(initialValue: template.type)
-            _endNum = State(initialValue: "8888") // 模板不带尾号
+            _endNum = State(initialValue: "8888")
             
             if template.localBaseCap > 0 {
                 _localBaseCapStr = State(initialValue: String(format: "%.0f", template.localBaseCap))
@@ -132,24 +137,16 @@ struct AddCardView: View {
                 _color2 = State(initialValue: .purple)
             }
             
-            if let cap = template.categoryCaps[.dining], cap > 0 {
-                _diningCapStr = State(initialValue: String(format: "%.0f", cap))
-            }
-            if let cap = template.categoryCaps[.grocery], cap > 0 {
-                _groceryCapStr = State(initialValue: String(format: "%.0f", cap))
-            }
-            if let cap = template.categoryCaps[.travel], cap > 0 {
-                _travelCapStr = State(initialValue: String(format: "%.0f", cap))
-            }
-            if let cap = template.categoryCaps[.digital], cap > 0 {
-                _digitalCapStr = State(initialValue: String(format: "%.0f", cap))
-            }
-            if let cap = template.categoryCaps[.other], cap > 0 {
-                _otherCapStr = State(initialValue: String(format: "%.0f", cap))
-            }
+            // 类别上限
+            if let cap = template.categoryCaps[.dining], cap > 0 { _diningCapStr = State(initialValue: String(format: "%.0f", cap)) }
+            if let cap = template.categoryCaps[.grocery], cap > 0 { _groceryCapStr = State(initialValue: String(format: "%.0f", cap)) }
+            if let cap = template.categoryCaps[.travel], cap > 0 { _travelCapStr = State(initialValue: String(format: "%.0f", cap)) }
+            if let cap = template.categoryCaps[.digital], cap > 0 { _digitalCapStr = State(initialValue: String(format: "%.0f", cap)) }
+            if let cap = template.categoryCaps[.other], cap > 0 { _otherCapStr = State(initialValue: String(format: "%.0f", cap)) }
 
             _region = State(initialValue: template.region)
             _capPeriod = State(initialValue: template.capPeriod)
+            
             let defStr = String(format: "%.1f", template.defaultRate)
             _defaultRateStr = State(initialValue: defStr.replacingOccurrences(of: ".0", with: ""))
 
@@ -160,34 +157,34 @@ struct AddCardView: View {
                 _foreignRateStr = State(initialValue: "")
             }
             
-            // 5. ✅ 填充特殊返现率 (从字典里拆出来填给对应的 State)
-            // 餐饮
+            // 类别费率
             if let dining = template.specialRate[.dining] {
                 let s = String(format: "%.1f", dining).replacingOccurrences(of: ".0", with: "")
                 _diningRateStr = State(initialValue: s)
             }
-            // 超市
             if let grocery = template.specialRate[.grocery] {
                 let s = String(format: "%.1f", grocery).replacingOccurrences(of: ".0", with: "")
                 _groceryRateStr = State(initialValue: s)
             }
-            // 出行
             if let travel = template.specialRate[.travel] {
                 let s = String(format: "%.1f", travel).replacingOccurrences(of: ".0", with: "")
                 _travelRateStr = State(initialValue: s)
             }
-            // 数码
             if let digital = template.specialRate[.digital] {
                 let s = String(format: "%.1f", digital).replacingOccurrences(of: ".0", with: "")
                 _digitalRateStr = State(initialValue: s)
             }
-            // 其他
             if let other = template.specialRate[.other] {
                 let s = String(format: "%.1f", other).replacingOccurrences(of: ".0", with: "")
                 _otherRateStr = State(initialValue: s)
             }
+            
+            // 👇 新增：填充模板的支付规则
+            // 假设 Template 里存的是 1.0 (代表 1%)，直接加载即可
+            _paymentMethodRates = State(initialValue: template.paymentMethodRates)
+            _paymentCaps = State(initialValue: template.paymentCaps)
         }
-        // 逻辑 C: 纯新建模式 -> 全部给空值/默认值
+        // 逻辑 C: 纯新建模式
         else {
             _bankName = State(initialValue: "")
             _cardType = State(initialValue: "")
@@ -198,6 +195,10 @@ struct AddCardView: View {
             _capPeriod = State(initialValue: .monthly)
             _defaultRateStr = State(initialValue: "1.0")
             _foreignRateStr = State(initialValue: "")
+            
+            // 初始化为空
+            _paymentMethodRates = State(initialValue: [:])
+            _paymentCaps = State(initialValue: [:])
         }
     }
     
@@ -227,6 +228,7 @@ struct AddCardView: View {
                             if newValue.count > 4 { endNum = String(newValue.prefix(4)) }
                         }
                 }
+                
                 HStack {
                     Text("还款日提醒 (每月)")
                     Spacer()
@@ -243,17 +245,17 @@ struct AddCardView: View {
                     ColorPicker("渐变色 1", selection: $color1)
                     ColorPicker("渐变色 2", selection: $color2)
                 }
+                
                 Section(header: Text("返现上限周期")){
                     Picker("返现上限周期", selection: $capPeriod) {
                         Text("按月").tag(CapPeriod.monthly)
                         Text("按年").tag(CapPeriod.yearly)
                     }
                 }
-                
                 .pickerStyle(.segmented)
-                // 4. 规则设置
+                
+                // 4. 规则设置 - 基础
                 Section(header: Text("基础返现 (所有消费)")) {
-
                     Picker("发行地区", selection: $region) {
                         ForEach(Region.allCases, id: \.self) { r in
                             Text("\(r.icon) \(r.rawValue)").tag(r)
@@ -273,7 +275,7 @@ struct AddCardView: View {
                         Text("本币\(capPeriod == .monthly ? "月" : "年")上限")
                             .font(.caption).foregroundColor(.secondary)
                         Spacer()
-                        TextField("无上限", text: $localBaseCapStr) // 👈 新增
+                        TextField("无上限", text: $localBaseCapStr)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
@@ -292,14 +294,15 @@ struct AddCardView: View {
                         Text("外币\(capPeriod == .monthly ? "月" : "年")上限")
                             .font(.caption).foregroundColor(.secondary)
                         Spacer()
-                        TextField("无上限", text: $foreignBaseCapStr) // 👈 新增
+                        TextField("无上限", text: $foreignBaseCapStr)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
                     }
                 }
+                
+                // 5. 规则设置 - 类别
                 Section(header: Text("类别加成 (额外叠加)")) {
-                    // 使用一个辅助 View 来减少重复代码 (在下方定义)
                     CategoryInputRow(name: "餐饮", rate: $diningRateStr, cap: $diningCapStr)
                     CategoryInputRow(name: "超市", rate: $groceryRateStr, cap: $groceryCapStr)
                     CategoryInputRow(name: "出行", rate: $travelRateStr, cap: $travelCapStr)
@@ -307,8 +310,54 @@ struct AddCardView: View {
                     CategoryInputRow(name: "其他", rate: $otherRateStr, cap: $otherCapStr)
                 }
                 
+                // 👇👇👇 6. 规则设置 - 支付方式 (新增 Section)
+                Section(header: Text("支付方式规则 (可选)")) {
+                    ForEach(PaymentMethod.allCases, id: \.self) { method in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Label(method.displayName, systemImage: method.iconName)
+                                    .foregroundColor(method.color)
+                                Spacer()
+                            }
+                            
+                            HStack {
+                                Text("加成:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                // 绑定到辅助函数 rateBinding
+                                TextField("0", value: rateBinding(for: method), format: .number)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 50)
+                                    .padding(4)
+                                    .background(Color(uiColor: .secondarySystemBackground))
+                                    .cornerRadius(5)
+                                Text("%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Text("上限:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                // 绑定到辅助函数 capBinding
+                                TextField("无", value: capBinding(for: method), format: .number)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 60)
+                                    .padding(4)
+                                    .background(Color(uiColor: .secondarySystemBackground))
+                                    .cornerRadius(5)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
             }
-            // 动态标题：有 cardToEdit 就是“编辑”，否则是“添加”
             .navigationTitle(cardToEdit == nil ? "添加信用卡" : "编辑卡片")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -324,9 +373,38 @@ struct AddCardView: View {
         }
     }
     
+    // MARK: - 辅助函数：生成 Binding
+    // 1. 用于绑定“加成费率”
+    func rateBinding(for method: PaymentMethod) -> Binding<Double> {
+        Binding(
+            get: { self.paymentMethodRates[method] ?? 0.0 },
+            set: { newValue in
+                if newValue == 0 {
+                    self.paymentMethodRates.removeValue(forKey: method)
+                } else {
+                    self.paymentMethodRates[method] = newValue
+                }
+            }
+        )
+    }
+    
+    // 2. 用于绑定“上限金额”
+    func capBinding(for method: PaymentMethod) -> Binding<Double> {
+        Binding(
+            get: { self.paymentCaps[method] ?? 0.0 },
+            set: { newValue in
+                if newValue == 0 {
+                    self.paymentCaps.removeValue(forKey: method)
+                } else {
+                    self.paymentCaps[method] = newValue
+                }
+            }
+        )
+    }
+    
     // --- 3. 核心保存逻辑 ---
     func saveCard() {
-        // 1. 处理费率 (保持不变)
+        // 1. 处理费率
         let defaultRate = (Double(defaultRateStr) ?? 0) / 100.0
         let rDay = Int(repaymentDayStr) ?? 0
         var foreignRate: Double? = nil
@@ -334,11 +412,11 @@ struct AddCardView: View {
             foreignRate = (Double(foreignRateStr) ?? 0) / 100.0
         }
         
-        // 2. 处理颜色 (保持不变)
+        // 2. 处理颜色
         let c1Hex = color1.toHex() ?? "0000FF"
         let c2Hex = color2.toHex() ?? "000000"
         
-        // 3. 处理类别加成率 (保持不变)
+        // 3. 处理类别加成率
         var specialRates: [Category: Double] = [:]
         if let rate = Double(diningRateStr), rate > 0 { specialRates[.dining] = rate / 100.0 }
         if let rate = Double(groceryRateStr), rate > 0 { specialRates[.grocery] = rate / 100.0 }
@@ -346,7 +424,7 @@ struct AddCardView: View {
         if let rate = Double(digitalRateStr), rate > 0 { specialRates[.digital] = rate / 100.0 }
         if let rate = Double(otherRateStr), rate > 0 { specialRates[.other] = rate / 100.0 }
         
-        // 👇 4. 处理新字段：上限 (Caps)
+        // 4. 处理基础和类别上限
         let locBaseCap = Double(localBaseCapStr) ?? 0
         let forBaseCap = Double(foreignBaseCapStr) ?? 0
         
@@ -357,9 +435,15 @@ struct AddCardView: View {
         if let cap = Double(digitalCapStr), cap > 0 { catCaps[.digital] = cap }
         if let cap = Double(otherCapStr), cap > 0 { catCaps[.other] = cap }
         
+        // 👇 5. 处理支付方式规则 (转换百分比)
+        // 界面上输入的是 1.0 (代表 1%)，存入需除以 100
+        let finalPaymentRates = paymentMethodRates.mapValues { $0 / 100.0 }
+        // 上限直接存
+        let finalPaymentCaps = paymentCaps
+        
         
         if let existingCard = cardToEdit {
-            // 编辑模式
+            // --- 编辑模式 ---
             existingCard.bankName = bankName
             existingCard.type = cardType
             existingCard.endNum = endNum
@@ -370,16 +454,19 @@ struct AddCardView: View {
             existingCard.capPeriod = capPeriod
             existingCard.specialRates = specialRates
             
-            
-            // 👇 更新新属性
             existingCard.localBaseCap = locBaseCap
             existingCard.foreignBaseCap = forBaseCap
             existingCard.categoryCaps = catCaps
-            existingCard.repaymentDay = rDay // 赋值
+            existingCard.repaymentDay = rDay
+            
+            // 👇 更新支付方式属性
+            existingCard.paymentMethodRates = finalPaymentRates
+            existingCard.paymentCaps = finalPaymentCaps
+            
             NotificationManager.shared.scheduleNotification(for: existingCard)
             
         } else {
-            // 新建模式
+            // --- 新建模式 ---
             let newCard = CreditCard(
                 bankName: bankName,
                 type: cardType,
@@ -390,12 +477,17 @@ struct AddCardView: View {
                 issueRegion: region,
                 foreignCurrencyRate: foreignRate,
                 templateKey: template?.templateKey,
-                // 👇 传入新属性
+                
                 localBaseCap: locBaseCap,
                 foreignBaseCap: forBaseCap,
+                // 👇 传入新属性
                 categoryCaps: catCaps,
                 capPeriod: capPeriod,
-                repaymentDay: rDay // 赋值
+                repaymentDay: rDay,
+                paymentMethodRates: finalPaymentRates,
+                paymentCaps: finalPaymentCaps,
+                
+                
             )
             context.insert(newCard)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

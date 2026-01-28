@@ -55,8 +55,14 @@ class Transaction: Identifiable {
         // 注意：如果你后续更新了 CreditCard.getRate 支持 paymentMethod，这里也要跟着改
         // 目前先保持原逻辑，避免报错
         let nominalRate = card?.getRate(for: category, location: location, payment: paymentMethod) ?? 0
-        self.rate = nominalRate
-        self.cashbackamount = finalBilling * nominalRate
+        
+        if let providedCashback = cashbackAmount {
+            self.cashbackamount = providedCashback
+            self.rate = (providedCashback / finalBilling * 100).rounded() / 100
+        } else {
+            self.cashbackamount = finalBilling * nominalRate
+            self.rate = nominalRate
+        }
     }
     
     var color: Color { category.color }
