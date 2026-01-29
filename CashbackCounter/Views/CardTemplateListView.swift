@@ -28,9 +28,51 @@ struct CardTemplateListView: View {
                     selectedTemplate = item
                 }) {
                     HStack {
-                        Circle()
-                            .fill(LinearGradient(colors: item.colors.map { Color(hex: $0) }, startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .frame(width: 40, height: 40)
+                        // 👇 核心修改：卡片图标显示逻辑
+                        if let urlStr = item.pictureURL {
+                            // 👉 分支 A: 如果是网络图片 (http 开头)
+                            if urlStr.lowercased().hasPrefix("http"), let url = URL(string: urlStr) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 50, height: 32)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                            .shadow(color: .black.opacity(0.1), radius: 1)
+                                        
+                                    case .empty:
+                                        ProgressView()
+                                            .frame(width: 40, height: 40)
+                                        
+                                    case .failure(_):
+                                        gradientCircle(for: item)
+                                        
+                                    @unknown default:
+                                        gradientCircle(for: item)
+                                    }
+                                }
+                            }
+                            // 👉 分支 B: 如果是本地 Assets 图片
+                            // 使用 UIImage(named:) 检查图片是否存在，避免显示空白
+                            else if UIImage(named: urlStr) != nil {
+                                Image(urlStr) // 直接加载 Assets 图片
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 50, height: 32) // 保持相同的尺寸
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .shadow(color: .black.opacity(0.1), radius: 1)
+                            }
+                            // 👉 分支 C: 既不是 URL 也没在本地找到图片
+                            else {
+                                gradientCircle(for: item)
+                            }
+                        } else {
+                            // 👉 分支 D: pictureURL 为空
+                            gradientCircle(for: item)
+                        }
+                        
 
                         VStack(alignment: .leading) {
                             Text(item.bankName).font(.headline)
@@ -50,7 +92,6 @@ struct CardTemplateListView: View {
                 }
             }
             // 👇 2. 核心跳转逻辑
-            // 当 selectedTemplate 有值时，弹出 AddCardView，并把模板传进去
             .sheet(item: $selectedTemplate) { template in
                 AddCardView(template: template, onSaved: {
                     // 当添加页保存成功时，执行这行代码：
@@ -59,5 +100,14 @@ struct CardTemplateListView: View {
                 })
             }
         }
+    }
+    
+    // MARK: - 辅助视图
+    
+    // 提取原本的渐变圆圈逻辑，方便复用
+    private func gradientCircle(for item: CardTemplate) -> some View {
+        Circle()
+            .fill(LinearGradient(colors: item.colors.map { Color(hex: $0) }, startPoint: .topLeading, endPoint: .bottomTrailing))
+            .frame(width: 40, height: 40)
     }
 }

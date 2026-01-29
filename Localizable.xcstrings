@@ -14,29 +14,6 @@
     " " : {
 
     },
-    "- %@%@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "- %@%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "- %@%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "- %@%@"
-          }
-        }
-      }
-    },
     "-%@" : {
 
     },
@@ -521,7 +498,14 @@
 
     },
     "交易详情" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transaction Details"
+          }
+        }
+      }
     },
     "人民币 (CNY)" : {
       "localizations" : {
@@ -1137,29 +1121,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外觀與語言"
-          }
-        }
-      }
-    },
-    "完成" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成"
           }
         }
       }
@@ -1909,29 +1870,6 @@
         }
       }
     },
-    "本单返现" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cashback for this bill"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本单返现"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本單返現"
-          }
-        }
-      }
-    },
     "本币%@上限" : {
       "localizations" : {
         "en" : {
@@ -2049,6 +1987,9 @@
           }
         }
       }
+    },
+    "正在下载卡面..." : {
+
     },
     "此卡片暂无交易记录" : {
       "localizations" : {
@@ -2371,29 +2312,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本"
-          }
-        }
-      }
-    },
-    "电子收据" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "E-Receipt"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电子收据"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "電子收據"
           }
         }
       }
@@ -2730,29 +2648,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
-          }
-        }
-      }
-    },
-    "该时间段内没有交易记录" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No transactions in this period"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "该时间段内没有交易记录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "該時間段內沒有交易記錄"
           }
         }
       }

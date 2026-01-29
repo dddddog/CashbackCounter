@@ -57,7 +57,7 @@ class CreditCard: Identifiable {
     var categoryCaps: [Category: Double]
     var paymentCaps: [PaymentMethod: Double]
         
-    
+    @Attribute(.externalStorage) var cardImageData: Data? = nil // 👈 新增：存储图片二进制数据
     // 👇 4. 建立反向关系 (可选)：这张卡关联了哪些交易？
     // 当你删卡时，关联的交易怎么办？.nullify 意思是把交易里的卡变成空，保留交易记录
     @Relationship(deleteRule: .nullify, inverse: \Transaction.card)
@@ -80,7 +80,8 @@ class CreditCard: Identifiable {
         repaymentDay: Int = 0,
         isRemindOpen: Bool = true,
         paymentMethodRates: [PaymentMethod: Double] = [:],
-        paymentCaps: [PaymentMethod: Double] = [:]
+        paymentCaps: [PaymentMethod: Double] = [:],
+        cardImageData: Data? = nil // 👈 新增参数
     ) {
         self.bankName = bankName
         self.type = type
@@ -101,6 +102,7 @@ class CreditCard: Identifiable {
         self.isRemindOpen = isRemindOpen
         self.paymentMethodRates = paymentMethodRates
         self.paymentCaps = paymentCaps
+        self.cardImageData = cardImageData // 👈 赋值
     }
     
     func getRate(for category: Category, location: Region, payment: PaymentMethod) -> Double {

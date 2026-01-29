@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 @Model
 final class CardTemplate: Identifiable {
@@ -38,7 +39,8 @@ final class CardTemplate: Identifiable {
     var paymentCaps: [PaymentMethod: Double]
     
     var capPeriod: CapPeriod
-
+    var pictureURL: String?
+    
     func applyRules(to card: CreditCard) {
         card.bankName = bankName
         card.type = type
@@ -63,25 +65,42 @@ final class CardTemplate: Identifiable {
         
         card.capPeriod = capPeriod
         card.templateKey = templateKey
+        card.paymentMethodRates = paymentMethodRates
+        if let source = pictureURL {
+            
+            // CardTemplate.swift 中的 applyRules 可以简化为：
+            Task {
+                // ✅ 无论 URL 还是 Assets 名字，统统交给 Manager 处理
+                if let data = await ImageDownloadManager.shared.downloadImageData(from: source) {
+                    await MainActor.run {
+                        withAnimation {
+                            card.cardImageData = data
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    init(templateKey: String,
-         bankName: String,
-         type: String,
-         colors: [String],
-         region: Region,
-         specialRate: [Category: Double],
-         // 新增参数
-         paymentMethodRates: [PaymentMethod: Double] = [:],
-         defaultRate: Double,
-         foreignCurrencyRate: Double?,
-         localBaseCap: Double = 0,
-         foreignBaseCap: Double = 0,
-         categoryCaps: [Category: Double] = [:],
-         // 新增参数
-         paymentCaps: [PaymentMethod: Double] = [:],
-         capPeriod: CapPeriod = .yearly) {
-        
+    init(
+        templateKey: String,
+        bankName: String,
+        type: String,
+        colors: [String],
+        region: Region,
+        specialRate: [Category: Double],
+        // 新增参数
+        paymentMethodRates: [PaymentMethod: Double] = [:],
+        defaultRate: Double,
+        foreignCurrencyRate: Double?,
+        localBaseCap: Double = 0,
+        foreignBaseCap: Double = 0,
+        categoryCaps: [Category: Double] = [:],
+        // 新增参数
+        paymentCaps: [PaymentMethod: Double] = [:],
+        capPeriod: CapPeriod = .yearly,
+        pictureURL: String? = nil)
+    {
         self.templateKey = templateKey
         self.bankName = bankName
         self.type = type
@@ -96,6 +115,7 @@ final class CardTemplate: Identifiable {
         self.categoryCaps = categoryCaps
         self.paymentCaps = paymentCaps // 赋值
         self.capPeriod = capPeriod
+        self.pictureURL = pictureURL
     }
 }
 
@@ -120,6 +140,7 @@ struct CardTemplateSeed {
     var capPeriod: CapPeriod = .yearly
 
     var templateKey: String { CardTemplate.templateKey(bankName: bankName, type: type) }
+    var pictureURL: String? = nil
 
     func makeModel() -> CardTemplate {
         CardTemplate(
@@ -136,7 +157,8 @@ struct CardTemplateSeed {
             foreignBaseCap: foreignBaseCap,
             categoryCaps: categoryCaps,
             paymentCaps: paymentCaps, // 传参
-            capPeriod: capPeriod
+            capPeriod: capPeriod,
+            pictureURL: pictureURL
         )
     }
 
@@ -155,6 +177,7 @@ struct CardTemplateSeed {
         template.categoryCaps = categoryCaps
         template.paymentCaps = paymentCaps // 同步
         template.capPeriod = capPeriod
+        template.pictureURL = pictureURL
     }
 }
 
@@ -163,17 +186,18 @@ extension CardTemplate {
     // 例如: paymentMethodRates: [.applePay: 1.0]
     
     static let defaultSeeds: [CardTemplateSeed] = [
-        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], defaultRate: 4.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 3600],capPeriod: .monthly),
-        CardTemplateSeed(bankName: "滙豐香港", type: "Pulse銀聯信用卡 ", colors: ["DB0011", "1A1A1A"], region: .cn, specialRate: [ .dining: 5 ], paymentMethodRates: [.pulse: 2.0], defaultRate: 2.4, foreignCurrencyRate: 2.4, localBaseCap: 2400, foreignBaseCap: 2400, categoryCaps: [.dining: 500], paymentCaps: [.pulse: 1600], capPeriod: .yearly),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], defaultRate: 4.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 3600],capPeriod: .monthly, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Red%20Credit%20Card%20%E6%BB%99%E8%B1%90Red%E4%BF%A1%E7%94%A8%E5%8D%A1.png?raw=true"),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Pulse銀聯信用卡 ", colors: ["DB0011", "1A1A1A"], region: .cn, specialRate: [ .dining: 5 ], paymentMethodRates: [.pulse: 2.0], defaultRate: 2.4, foreignCurrencyRate: 2.4, localBaseCap: 2400, foreignBaseCap: 2400, categoryCaps: [.dining: 500], paymentCaps: [.pulse: 1600], capPeriod: .yearly, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Dual%20Currency%20Diamond%20Credit%20Card.png?raw=true"),
         CardTemplateSeed(bankName: "滙豐香港", type: "卓越理財信用卡", colors: ["111111", "D9D9D9"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 2.4, foreignBaseCap: 2400, capPeriod: .yearly),
         CardTemplateSeed(bankName: "滙豐香港", type: "Visa Signature卡", colors: ["1C1C1C", "757575"], region: .hk, specialRate: [ : ], defaultRate: 1.6, foreignCurrencyRate: 3.6, foreignBaseCap: 3600, capPeriod: .yearly),
-        CardTemplateSeed(bankName: "滙豐香港", type: "萬事達卡扣賬卡", colors: ["1D5564", "85BDCD"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 0.4),
-        CardTemplateSeed(bankName: "HSBC US", type: "Elite ", colors: ["050505", "050505"], region: .us, specialRate: [ .travel: 5.28,.dining:1.32], defaultRate: 1.32, foreignCurrencyRate: 1.32),
-        CardTemplateSeed(bankName: "Ready", type: "Metal ", colors: ["BD9850", "F2E9D4"], region: .us, specialRate: [:], defaultRate: 3, foreignCurrencyRate: 3),
+        CardTemplateSeed(bankName: "滙豐香港", type: "萬事達卡扣賬卡", colors: ["1D5564", "85BDCD"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 0.4, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Mastercard%20Debit%20%E6%BB%99%E8%B1%90%E8%90%AC%E4%BA%8B%E9%81%94%E5%8D%A1%E6%89%A3%E8%84%B9%E5%8D%A1.png?raw=true"),
+        CardTemplateSeed(bankName: "HSBC US", type: "Elite", colors: ["050505", "050505"], region: .us, specialRate: [ .travel: 5.28,.dining:1.32], defaultRate: 1.32, foreignCurrencyRate: 1.32, pictureURL: "hsbcuselite"),
+        CardTemplateSeed(bankName: "HSBC US", type: "Premier", colors: ["050505", "050505"], region: .us, specialRate: [ .travel: 1.32,.grocery:2.64], defaultRate: 1.32, foreignCurrencyRate: 1.32, pictureURL: "hsbcuspremiercard"),
+        CardTemplateSeed(bankName: "Ready", type: "Metal", colors: ["BD9850", "F2E9D4"], region: .us, specialRate: [:], defaultRate: 3, foreignCurrencyRate: 3, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/Ready/Ready%20Metal%20Platinum.jpg?raw=true"),
         CardTemplateSeed(bankName: "工銀亞洲", type: "Visa Signature", colors: ["121212", "EDC457"], region: .hk, specialRate: [ : ], defaultRate: 1.5, foreignCurrencyRate: 1.5, categoryCaps: [: ]),
         CardTemplateSeed(bankName: "工銀亞洲", type: "粵港澳灣區信用卡", colors: ["0F0F0F", "C0C0C0"], region: .cn, specialRate: [ : ], defaultRate: 1.5, foreignCurrencyRate: 1.5, categoryCaps: [: ]),
         CardTemplateSeed(bankName: "信銀國際", type: "大灣區雙幣信用卡", colors: ["8A8F99", "E3DEE9"], region: .cn, specialRate: [ : ], paymentMethodRates: [.gba : 6], defaultRate: 4, foreignCurrencyRate: 0.4, localBaseCap: 150, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.gba: 250], capPeriod: .monthly),
-        CardTemplateSeed(bankName: "中銀香港", type: "萬事達卡扣賬卡", colors: ["121212", "D4B979"], region: .hk, specialRate: [ : ], defaultRate: 0.5, foreignCurrencyRate: 0.5),
+        CardTemplateSeed(bankName: "中銀香港", type: "萬事達卡扣賬卡", colors: ["121212", "D4B979"], region: .hk, specialRate: [ : ], defaultRate: 0.5, foreignCurrencyRate: 0.5, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/Bank%20of%20China%20(Hong%20Kong)/BOC%20Mastercard%20Debit%20Card.png?raw=true"),
         CardTemplateSeed(bankName: "农业银行", type: "大学生青春卡", colors: ["9EC0B3", "D9A62E"], region: .cn, specialRate: [ : ], paymentMethodRates: [.applePay : 1], defaultRate: 0.1, foreignCurrencyRate: 3, foreignBaseCap: 100, paymentCaps: [.applePay : 200], capPeriod: .monthly),
         CardTemplateSeed(bankName: "农业银行", type: "Visa尊然白金信用卡", colors: ["1A1A1A", "C4C6C8"], region: .cn, specialRate: [ : ], defaultRate: 0.1, foreignCurrencyRate: 3, foreignBaseCap: 70,capPeriod: .monthly),
         CardTemplateSeed(bankName: "工商银行", type: "牡丹祥运信用卡", colors: ["2F2F2F", "C7A04D"], region: .cn, specialRate: [ : ], defaultRate: 0, foreignCurrencyRate: 3),
