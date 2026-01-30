@@ -50,12 +50,12 @@ class CreditCard: Identifiable {
     var foreignBaseCap: Double
     
     // 返现上限结算周期：按年 / 按月
-    var capPeriod: CapPeriod
+    var capPeriod: CapPeriod = CapPeriod.yearly
         
     // B. 类别加成上限 (共用制：不分地区，只看类别)
     // Key: 消费类别, Value: 该类别在一个结算周期(capPeriod)内的总加成上限
-    var categoryCaps: [Category: Double]
-    var paymentCaps: [PaymentMethod: Double]
+    var categoryCaps: [Category: Double] = [:]
+    var paymentCaps: [PaymentMethod: Double] = [:]
         
     @Attribute(.externalStorage) var cardImageData: Data? = nil // 👈 新增：存储图片二进制数据
     // 👇 4. 建立反向关系 (可选)：这张卡关联了哪些交易？
