@@ -28,6 +28,9 @@ struct BillHomeView: View {
     @State private var isWholeYear = false
     @State private var selectedCategory: Category? = nil
     @State private var showIncomeOnly = false
+    
+    // 👇 新增：搜索文本状态
+    @State private var searchText = ""
 
     // 趋势图与导入状态
     @Query var cards: [CreditCard]
@@ -43,6 +46,7 @@ struct BillHomeView: View {
     
     // 5. 核心筛选逻辑 (不含支付方式)
     var filteredTransactions: [Transaction] {
+        // 第一步：日期筛选
         var results = showAll ? dbTransactions : dbTransactions.filter { t in
             if isWholeYear {
                 return Calendar.current.isDate(t.date, equalTo: selectedDate, toGranularity: .year)
@@ -51,14 +55,22 @@ struct BillHomeView: View {
             }
         }
 
-        // 按类别筛选
+        // 第二步：按类别筛选
         if let category = selectedCategory {
             results = results.filter { $0.category == category }
         }
 
-        // 按收入筛选
+        // 第三步：按收入筛选
         if showIncomeOnly {
             results = results.filter { ($0.incomes?.isEmpty == false) }
+        }
+        
+        // 👇 第四步：新增搜索过滤逻辑
+        if !searchText.isEmpty {
+            results = results.filter { t in
+                // 不区分大小写的商户名搜索
+                t.merchant.localizedCaseInsensitiveContains(searchText)
+            }
         }
 
         return results
@@ -225,9 +237,9 @@ struct BillHomeView: View {
                             // 空状态提示
                             if filteredTransactions.isEmpty {
                                 ContentUnavailableView(
-                                    "暂无账单",
-                                    systemImage: "list.bullet.clipboard",
-                                    description: Text("该筛选条件下没有交易记录")
+                                    searchText.isEmpty ? "暂无账单" : "未找到结果",
+                                    systemImage: searchText.isEmpty ? "list.bullet.clipboard" : "magnifyingglass",
+                                    description: Text(searchText.isEmpty ? "该筛选条件下没有交易记录" : "尝试更换关键词或检查筛选条件")
                                 )
                                 .padding(.top, 40)
                             }
@@ -258,6 +270,8 @@ struct BillHomeView: View {
                     }
                 }
             }
+            // 👇 新增：搜索框
+            .searchable(text: $searchText, placement: .automatic, prompt: "搜索商户")
             // 文件导入器
             .fileImporter(
                 isPresented: $showFileImporter,

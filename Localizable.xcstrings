@@ -422,7 +422,14 @@
       }
     },
     "上限:" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limit:"
+          }
+        }
+      }
     },
     "主货币" : {
       "localizations" : {
@@ -495,7 +502,20 @@
       }
     },
     "交易类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment Method"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交易類型"
+          }
+        }
+      }
     },
     "交易详情" : {
       "localizations" : {
@@ -503,6 +523,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transaction Details"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交易詳情"
           }
         }
       }
@@ -600,7 +626,20 @@
       }
     },
     "入账金额" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Billing Amount"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入賬金額"
+          }
+        }
+      }
     },
     "入账金额 (%@)" : {
       "localizations" : {
@@ -761,7 +800,20 @@
       }
     },
     "凭证" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Receipt"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "憑證"
+          }
+        }
+      }
     },
     "分析" : {
       "localizations" : {
@@ -840,10 +892,36 @@
       }
     },
     "删除此交易" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Transaction"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除此交易"
+          }
+        }
+      }
     },
     "加成:" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonus:"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加成:"
+          }
+        }
+      }
     },
     "加成%" : {
       "localizations" : {
@@ -1295,6 +1373,9 @@
         }
       }
     },
+    "尝试更换关键词或检查筛选条件" : {
+
+    },
     "尾号 (后四位)" : {
       "localizations" : {
         "en" : {
@@ -1340,7 +1421,14 @@
       }
     },
     "已抵扣/关联收入" : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已抵扣/關聯收入"
+          }
+        }
+      }
     },
     "常规" : {
       "localizations" : {
@@ -1546,8 +1634,18 @@
         }
       }
     },
-    "支付卡片" : {
+    "搜索商户" : {
 
+    },
+    "支付卡片" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付卡片"
+          }
+        }
+      }
     },
     "支付方式" : {
       "localizations" : {
@@ -1572,13 +1670,34 @@
       }
     },
     "支付方式规则 (可选)" : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付方式規則 (可選)"
+          }
+        }
+      }
     },
     "支付详情" : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付詳情"
+          }
+        }
+      }
     },
     "支付账户" : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付賬戶"
+          }
+        }
+      }
     },
     "支出" : {
       "localizations" : {
@@ -1596,16 +1715,6 @@
         }
       }
     },
-    "收入 %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Income %@"
-          }
-        }
-      }
-    },
     "收入信息" : {
       "localizations" : {
         "en" : {
@@ -1618,23 +1727,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收入信息"
-          }
-        }
-      }
-    },
-    "收入单" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Income"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收入單"
           }
         }
       }
@@ -1760,7 +1852,14 @@
       }
     },
     "无收据图片" : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無收據圖片"
+          }
+        }
+      }
     },
     "日" : {
       "localizations" : {
@@ -1853,6 +1952,9 @@
           }
         }
       }
+    },
+    "未找到结果" : {
+
     },
     "未设置还款日" : {
       "localizations" : {
@@ -1989,7 +2091,14 @@
       }
     },
     "正在下载卡面..." : {
-
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下載卡面..."
+          }
+        }
+      }
     },
     "此卡片暂无交易记录" : {
       "localizations" : {
@@ -2030,7 +2139,20 @@
       }
     },
     "汇率约 %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exchange Rate %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯率約 ￼%@"
+          }
+        }
+      }
     },
     "浅色模式" : {
       "localizations" : {
@@ -2203,7 +2325,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新增信用卡"
+            "value" : "添加信用卡"
           }
         }
       }
@@ -2214,6 +2336,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add Income"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加收入"
           }
         }
       }
@@ -2653,7 +2781,20 @@
       }
     },
     "该筛选条件下没有交易记录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Transaction"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該篩選條件下沒有交易記錄"
+          }
+        }
+      }
     },
     "语言设置" : {
       "localizations" : {
@@ -2747,6 +2888,9 @@
         }
       }
     },
+    "赚 %@" : {
+
+    },
     "趋势" : {
       "localizations" : {
         "en" : {
@@ -2801,6 +2945,9 @@
         }
       }
     },
+    "返 %@" : {
+
+    },
     "返现" : {
       "localizations" : {
         "en" : {
@@ -2834,7 +2981,20 @@
       }
     },
     "返现分析" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cashback Analyse"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返現分析"
+          }
+        }
+      }
     },
     "还款提醒" : {
       "localizations" : {

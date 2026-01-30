@@ -26,76 +26,74 @@ struct TransactionDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                // MARK: - 1. 顶部 Header (商户 & 金额)
+                // MARK: - 1. 顶部 Header (紧凑版)
                 Section {
-                    VStack(spacing: 16) {
-                        // 商户/分类图标
-                        ZStack {
-                            Circle()
-                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                                .frame(width: 80, height: 80)
-                                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    VStack(spacing: 8) { // 减小垂直间距
+                        // 第一行：图标 + 商户名
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                                    .frame(width: 50, height: 50) // 缩小尺寸 80 -> 50
+                                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
+                                
+                                Image(systemName: transaction.category.iconName)
+                                    .font(.system(size: 24))
+                                    .foregroundColor(transaction.category.color) // 使用分类原本颜色
+                            }
                             
-                            Image(systemName: transaction.category.iconName)
-                                .font(.system(size: 36))
-                                .foregroundColor(.blue)
-                        }
-                        .padding(.top, 10)
-                        
-                        VStack(spacing: 4) {
                             Text(transaction.merchant)
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                        }
+                        
+                        // 第二行：大金额
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(transaction.location.currencyCode)
                                 .font(.headline)
                                 .foregroundColor(.secondary)
+                                .offset(y: -4) // 稍微上移，让主金额更突出
                             
-                            // 金额显示
                             Text(String(format: "%.2f", transaction.amount))
-                                .font(.system(size: 40, weight: .bold, design: .rounded))
+                                .font(.system(size: 44, weight: .bold, design: .rounded)) // 稍微加大金额，但整体高度变小
                                 .foregroundColor(.primary)
-                            
-                            // 币种
-                            Text(transaction.location.currencyCode)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color(uiColor: .secondarySystemBackground))
-                                .cornerRadius(4)
                         }
+                        .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear) // 透明背景
-                    .listRowInsets(EdgeInsets())    // 移除边距
-                    .padding(.bottom, 10)
+                    .padding(.vertical, 10) // 减少上下留白
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
                 
                 // MARK: - 2. 交易信息
                 Section("基本信息") {
                     DetailRow(title: "交易时间", value: dateFormatter.string(from: transaction.date), icon: "calendar")
-                    
                     DetailRow(title: "消费类别", value: transaction.category.displayName, icon: "tag")
-                    
                     DetailRow(title: "消费地区", value: transaction.location.rawValue, icon: "mappin.and.ellipse")
                 }
                 
-                // MARK: - 3. 支付详情 (包含新增的支付方式)
+                // MARK: - 3. 支付详情
                 Section("支付详情") {
-                    // 👇 新增：支付方式
+                    // 支付方式
                     HStack {
                         Label {
                             Text("支付方式")
                         } icon: {
-                            Image(systemName: "iphone.gen3") // 通用支付图标，或用 link
+                            Image(systemName: "iphone.gen3")
                                 .foregroundColor(.purple)
                         }
-                        
                         Spacer()
                         
-                        // 支付方式的具体内容
+                        // 胶囊样式的支付方式
                         HStack(spacing: 6) {
                             Image(systemName: transaction.paymentMethod.iconName)
-                                .foregroundColor(transaction.paymentMethod.color)
+                                .font(.caption)
                             Text(transaction.paymentMethod.displayName)
-                                .foregroundColor(.secondary)
+                                .font(.subheadline)
                         }
+                        .foregroundColor(transaction.paymentMethod.color)
                         .padding(.vertical, 4)
                         .padding(.horizontal, 8)
                         .background(transaction.paymentMethod.color.opacity(0.1))
@@ -108,10 +106,9 @@ struct TransactionDetailView: View {
                             Label("支付卡片", systemImage: "creditcard")
                             Spacer()
                             HStack(spacing: 6) {
-                                // 卡片颜色小圆点
                                 Circle()
                                     .fill(LinearGradient(
-                                        colors: card.colors, // 👈 直接使用 [Color] 数组
+                                        colors: card.colors,
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ))
@@ -129,13 +126,12 @@ struct TransactionDetailView: View {
                     }
                     
                     // 入账金额 (如果有汇率差)
-                    HStack {
-                        Label("入账金额", systemImage: "banknote")
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Text(String(format: "%.2f %@", transaction.billingAmount, transaction.card?.issueRegion.currencyCode ?? "CNY"))
-                            // 如果原币种和入账币种不同，显示汇率
-                            if transaction.amount != transaction.billingAmount && transaction.amount > 0 {
+                    if transaction.amount != transaction.billingAmount && transaction.amount > 0 {
+                        HStack {
+                            Label("入账金额", systemImage: "banknote")
+                            Spacer()
+                            VStack(alignment: .trailing) {
+                                Text(String(format: "%.2f %@", transaction.billingAmount, transaction.card?.issueRegion.currencyCode ?? "CNY"))
                                 let rate = transaction.billingAmount / transaction.amount
                                 Text("汇率约 \(String(format: "%.4f", rate))")
                                     .font(.caption2)
@@ -160,7 +156,6 @@ struct TransactionDetailView: View {
                             .foregroundColor(.green)
                     }
                     
-                    // 计算出的实际回馈率
                     if transaction.billingAmount > 0 {
                         let actualRate = (transaction.cashbackamount / transaction.billingAmount) * 100
                         DetailRow(title: "实际回馈率", value: String(format: "%.2f%%", actualRate), icon: "percent")
@@ -176,7 +171,7 @@ struct TransactionDetailView: View {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(height: 200)
+                                .frame(height: 160) // 稍微改小一点高度，节省空间
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .listRowInsets(EdgeInsets())
                         }
@@ -190,7 +185,7 @@ struct TransactionDetailView: View {
                     }
                 }
                 
-                // 显示关联的收入 (如果有)
+                // 关联收入
                 if let incomes = transaction.incomes, !incomes.isEmpty {
                     Section("已抵扣/关联收入") {
                         ForEach(incomes) { income in
@@ -214,7 +209,6 @@ struct TransactionDetailView: View {
                 Section {
                     Button(role: .destructive) {
                         dismiss()
-                        // 稍微延迟删除，防止动画冲突
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             transaction.modelContext?.delete(transaction)
                         }
@@ -227,10 +221,23 @@ struct TransactionDetailView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped) // 更加现代的圆角分组风格
+            .listStyle(.insetGrouped)
             .navigationTitle("交易详情")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // 1. 左上角关闭按钮
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundColor(.secondary)
+                            .font(.title2)
+                    }
+                }
+                
+                // 2. 右上角编辑按钮
                 ToolbarItem(placement: .primaryAction) {
                     Button("编辑") {
                         showEditSheet = true
@@ -240,17 +247,18 @@ struct TransactionDetailView: View {
             .sheet(isPresented: $showEditSheet) {
                 AddTransactionView(transaction: transaction)
             }
-            // 简单的全屏查看收据
-            .fullScreenCover(isPresented: $showFullScreenReceipt) {
-                if let data = transaction.receiptData, let img = UIImage(data: data) {
-                    ReceiptFullScreenView(image: img)
+            .sheet(isPresented: $showFullScreenReceipt) {
+                if let data = transaction.receiptData,
+                   let image = UIImage(data: data) {
+                    ReceiptFullScreenView(image: image)
+                        .presentationDragIndicator(.visible)
                 }
             }
         }
     }
 }
 
-// 辅助视图：通用的详情行
+// 辅助视图
 struct DetailRow: View {
     let title: String
     let value: String
@@ -265,5 +273,3 @@ struct DetailRow: View {
         }
     }
 }
-
-
