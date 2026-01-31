@@ -65,7 +65,6 @@ final class CardTemplate: Identifiable {
         
         card.capPeriod = capPeriod
         card.templateKey = templateKey
-        card.paymentMethodRates = paymentMethodRates
         if let source = pictureURL {
             
             // CardTemplate.swift 中的 applyRules 可以简化为：
@@ -186,7 +185,7 @@ extension CardTemplate {
     // 例如: paymentMethodRates: [.applePay: 1.0]
     
     static let defaultSeeds: [CardTemplateSeed] = [
-        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], defaultRate: 4.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 3600],capPeriod: .monthly, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Red%20Credit%20Card%20%E6%BB%99%E8%B1%90Red%E4%BF%A1%E7%94%A8%E5%8D%A1.png?raw=true"),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], defaultRate: 1.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 300],capPeriod: .monthly, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Red%20Credit%20Card%20%E6%BB%99%E8%B1%90Red%E4%BF%A1%E7%94%A8%E5%8D%A1.png?raw=true"),
         CardTemplateSeed(bankName: "滙豐香港", type: "Pulse銀聯信用卡 ", colors: ["DB0011", "1A1A1A"], region: .cn, specialRate: [ .dining: 5 ], paymentMethodRates: [.pulse: 2.0], defaultRate: 2.4, foreignCurrencyRate: 2.4, localBaseCap: 2400, foreignBaseCap: 2400, categoryCaps: [.dining: 500], paymentCaps: [.pulse: 1600], capPeriod: .yearly, pictureURL: "https://github.com/HarukaKinen/Cardentify/blob/main/Cards/The%20Hongkong%20and%20Shanghai%20Banking%20Corporation/HSBC%20Dual%20Currency%20Diamond%20Credit%20Card.png?raw=true"),
         CardTemplateSeed(bankName: "滙豐香港", type: "卓越理財信用卡", colors: ["111111", "D9D9D9"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 2.4, foreignBaseCap: 2400, capPeriod: .yearly),
         CardTemplateSeed(bankName: "滙豐香港", type: "Visa Signature卡", colors: ["1C1C1C", "757575"], region: .hk, specialRate: [ : ], defaultRate: 1.6, foreignCurrencyRate: 3.6, foreignBaseCap: 3600, capPeriod: .yearly, pictureURL: "hsbcvs"),

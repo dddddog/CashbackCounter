@@ -107,7 +107,7 @@ struct AddCardView: View {
             if let cap = card.categoryCaps[.digital], cap > 0 { _digitalCapStr = State(initialValue: String(format: "%.0f", cap)) }
             if let cap = card.categoryCaps[.other], cap > 0 { _otherCapStr = State(initialValue: String(format: "%.0f", cap)) }
             
-            let ratesForUI = card.paymentMethodRates.mapValues { $0 * 100 }
+            let ratesForUI = card.paymentMethodRates.mapValues { $0 * 100}
             _paymentMethodRates = State(initialValue: ratesForUI)
             _paymentCaps = State(initialValue: card.paymentCaps)
             
