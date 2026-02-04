@@ -352,7 +352,9 @@ struct AddTransactionView: View {
                     t.cashbackamount = finalCashback
                 }
                 
-                if let img = imageData { t.receiptData = img }
+                if let img = imageData { t.receiptData = img }else {
+                    t.receiptData = nil
+                }
                 
             } else {
                 // --- 新建模式 ---

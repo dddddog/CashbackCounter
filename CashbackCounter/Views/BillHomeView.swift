@@ -91,11 +91,12 @@ struct BillHomeView: View {
         return filteredTransactions.reduce(0) { total, t in
             let code = t.card?.issueRegion.currencyCode ?? "CNY"
             let rate = exchangeRates[code] ?? 1.0
-            let incomerate = exchangeRates[mainCurrencyCode] ?? 1.0
 
             let expenseInMain = t.billingAmount / rate
             let incomeInMain = (t.incomes ?? []).reduce(0) { partial, income in
-                partial + (income.amount / incomerate)
+                let incomeCode = income.location.currencyCode
+                let incomeRate = exchangeRates[incomeCode] ?? 1.0
+                return partial + (income.amount / incomeRate)
             }
 
             return total + (expenseInMain - incomeInMain)
