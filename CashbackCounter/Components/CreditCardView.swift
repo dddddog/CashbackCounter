@@ -18,52 +18,54 @@ struct CreditCardView: View {
     @State private var decodedImage: UIImage? = nil
     
     var body: some View {
-        ZStack(alignment: .leading) {
-            // 1. 背景渐变
-            LinearGradient(gradient: Gradient(colors: colors), startPoint: .topLeading, endPoint: .bottomTrailing)
-            
-            // 2. 装饰纹理
-            Circle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 200, height: 220)
-                .offset(x: 150, y: -50)
-            
-            // 3. 图片层（✅ 修改：使用异步解码后的 State）
-            if let uiImage = decodedImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 220)
-                    // ✅ 关键修复：限制图片最大宽度，防止宽图撑爆布局导致 GeometryReader 坐标错乱
-                    .frame(maxWidth: UIScreen.main.bounds.width)
-                    .clipped()
-                    // 加一层极淡的黑罩，确保白色卡号稍微清晰点，又不影响卡面美观
-                    .overlay(Color.black.opacity(0.05))
-            }
-            
-            // 4. 文字信息层
-            VStack(alignment: .leading) {
-                if cardImageData == nil {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                // 1. 背景渐变
+                LinearGradient(gradient: Gradient(colors: colors), startPoint: .topLeading, endPoint: .bottomTrailing)
+                
+                // 2. 装饰纹理
+                Circle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 200, height: 220)
+                    .offset(x: 150, y: -50)
+                
+                // 3. 图片层（✅ 修改：使用异步解码后的 State）
+                if let uiImage = decodedImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 220)
+                        // ✅ 关键修复：限制图片最大宽度，防止宽图撑爆布局导致 GeometryReader 坐标错乱
+                        .frame(maxWidth: proxy.size.width)
+                        .clipped()
+                        // 加一层极淡的黑罩，确保白色卡号稍微清晰点，又不影响卡面美观
+                        .overlay(Color.black.opacity(0.05))
+                }
+                
+                // 4. 文字信息层
+                VStack(alignment: .leading) {
+                    if cardImageData == nil {
+                        HStack {
+                            Image(systemName: "wave.3.right") // 非接触支付图标
+                                .font(.title2)
+                            Spacer()
+                            Text(bankName + " " + type)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .padding(6)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(5)
+                        }
+                    }
+                    Spacer()
                     HStack {
-                        Image(systemName: "wave.3.right") // 非接触支付图标
-                            .font(.title2)
-                        Spacer()
-                        Text(bankName + " " + type)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .padding(6)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(5)
+                        Text("**** **** **** \(endNum)")
+                            .font(.subheadline)
                     }
                 }
-                Spacer()
-                HStack {
-                    Text("**** **** **** \(endNum)")
-                        .font(.subheadline)
-                }
+                .padding(25)
+                .foregroundColor(.white)
             }
-            .padding(25)
-            .foregroundColor(.white)
         }
         .frame(height: 220)
         .cornerRadius(20)

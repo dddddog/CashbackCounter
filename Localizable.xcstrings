@@ -67,6 +67,16 @@
         }
       }
     },
+    "%@ %@趋势" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@趋势"
+          }
+        }
+      }
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -88,6 +98,9 @@
           }
         }
       }
+    },
+    "%@分析" : {
+
     },
     "%lld" : {
       "localizations" : {
@@ -816,6 +829,7 @@
       }
     },
     "分析" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1501,6 +1515,7 @@
       }
     },
     "总" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1515,6 +1530,9 @@
           }
         }
       }
+    },
+    "总%@趋势" : {
+
     },
     "总支出" : {
       "localizations" : {
@@ -1700,6 +1718,7 @@
       }
     },
     "支出" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2892,6 +2911,7 @@
 
     },
     "趋势" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2949,6 +2969,7 @@
 
     },
     "返现" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

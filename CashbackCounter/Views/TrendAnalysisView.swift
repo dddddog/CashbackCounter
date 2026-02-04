@@ -7,7 +7,7 @@ enum TrendType {
     case expense  // 支出
     case cashback // 返现
     
-    var title: LocalizedStringKey {
+    var title: String {
         switch self {
         case .expense : return "支出"
         case .cashback: return "返现"
@@ -92,13 +92,13 @@ struct TrendAnalysisView: View {
                     Group {
                         if let card = selectedCard {
                             // 「招商银行 支出趋势」这种
-                            (Text(card.bankName) + Text(" ") + Text(type.title) + Text("趋势"))
+                            Text("\(card.bankName) \(type.title)趋势")
                                 .font(.headline)
                                 .padding(.horizontal)
                                 .padding(.top, 16)
                         } else {
                             // 「总支出趋势」这种
-                            (Text("总") + Text(type.title) + Text("趋势"))
+                            Text("总\(type.title)趋势")
                                 .font(.headline)
                                 .padding(.horizontal)
                                 .padding(.top, 16)
@@ -222,7 +222,7 @@ struct TrendAnalysisView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(
-                Text(type.title) + Text("分析")
+                Text("\(type.title)分析")
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

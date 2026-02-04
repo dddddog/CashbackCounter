@@ -340,14 +340,14 @@ struct BillHomeView: View {
             do {
                 let rates = await CurrencyService.getRates(base: mainCurrencyCode)
                 await MainActor.run { self.exchangeRates = rates }
-            } catch { print("汇率获取失败") }
+            }
         }
-        .onChange(of: mainCurrencyCode) { newCode in
+        .onChange(of: mainCurrencyCode) { _, newCode in
             Task {
                 do {
                     let rates = await CurrencyService.getRates(base: newCode)
                     await MainActor.run { self.exchangeRates = rates }
-                } catch { print("汇率获取失败") }
+                }
             }
         }
         .onAppear {

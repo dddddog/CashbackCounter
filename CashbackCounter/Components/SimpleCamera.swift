@@ -91,19 +91,27 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
 }
 
 // 2. 也是一个 UIViewRepresentable，把相机画面转成 View
+final class CameraPreviewView: UIView {
+    override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+    
+    var previewLayer: AVCaptureVideoPreviewLayer {
+        guard let layer = layer as? AVCaptureVideoPreviewLayer else {
+            fatalError("Layer is not AVCaptureVideoPreviewLayer.")
+        }
+        return layer
+    }
+}
+
 struct CameraPreview: UIViewRepresentable {
     @ObservedObject var cameraService: CameraService
+    typealias UIViewType = CameraPreviewView
     
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: UIScreen.main.bounds)
-        
-        let previewLayer = AVCaptureVideoPreviewLayer(session: cameraService.session)
-        previewLayer.frame = view.frame
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-        
+    func makeUIView(context: Context) -> CameraPreviewView {
+        let view = CameraPreviewView(frame: .zero)
+        view.previewLayer.session = cameraService.session
+        view.previewLayer.videoGravity = .resizeAspectFill
         return view
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {}
+    func updateUIView(_ uiView: CameraPreviewView, context: Context) {}
 }
