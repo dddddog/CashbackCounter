@@ -17,7 +17,8 @@ enum SheetType: Identifiable {
 }
 
 struct CardListView: View {
-    @Query var cards: [CreditCard]
+    @Query(sort: [SortDescriptor(\CreditCard.bankName, order: .forward)])
+    var cards: [CreditCard]
     @Environment(\.modelContext) var context
     
     // 控制编辑状态
@@ -72,7 +73,6 @@ struct CardListView: View {
                 ScrollView(showsIndicators: false) {
                     ZStack(alignment: .top) {
                         // ❌ 已删除：旧的 GeometryReader 和 ScrollOffsetKey 逻辑
-                        
                         ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                             
                             // 计算当前卡片的状态

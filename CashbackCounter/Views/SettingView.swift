@@ -7,11 +7,20 @@
 
 import SwiftUI
 import SwiftData
-import UIKit // 👈 1. 引入 UIKit 以支持 UIActivityViewController
+import UIKit
+
+// MARK: - Helper Models
+// 1. 新增：用于封装分享数据的结构体，遵循 Identifiable 协议
+// 这解决了 .sheet(isPresented:) 导致的时序问题
+struct ShareData: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
 
 struct SettingsView: View {
-    // 获取 App 版本号
+    // MARK: - Properties
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    
     @AppStorage("userTheme") private var userTheme: Int = 0
     @AppStorage("userLanguage") private var userLanguage: String = "system"
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
@@ -19,7 +28,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) var context
     @State private var showConfirmClear: Bool = false
     
-    // 👇 2. 新增：获取数据库中的所有卡片和交易 (用于导出)
+    // 获取数据库数据
     @Query var cards: [CreditCard]
     @Query(
         sort: [
@@ -29,14 +38,17 @@ struct SettingsView: View {
     )
     var transactions: [Transaction]
     
-    // 👇 3. 新增：控制导出分享面板的状态
-    @State private var showShareSheet = false
-    @State private var exportItems: [Any] = []
+    // MARK: - Export State
+    // 2. 修改：使用 item 形式的状态来控制 Sheet
+    @State private var shareData: ShareData?
+    // 3. 新增：控制导出过程中的 Loading 状态
+    @State private var isExporting = false
 
-    
+    // MARK: - Body
     var body: some View {
         NavigationView {
             List {
+                // Header Section
                 Section {
                     VStack(spacing: 8) {
                         ZStack {
@@ -71,6 +83,7 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Color.clear)
                 
+                // Appearance Section
                 Section(header: Text("外观与语言")) {
                     Picker(selection: $userTheme, label: Label("主题模式", systemImage: "paintpalette")) {
                         Text("跟随系统").tag(0)
@@ -86,6 +99,7 @@ struct SettingsView: View {
                     }
                 }
                 
+                // General Section
                 Section(header: Text("常规")) {
                     Picker(selection: $mainCurrencyCode, label: Label("主货币", systemImage: "banknote")) {
                         Text("人民币 (CNY)").tag("CNY")
@@ -99,30 +113,32 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Data Management Section
                 Section(header: Text("数据管理")) {
                     Label("iCloud 同步 (功能正在开发中)", systemImage: "icloud")
                         .foregroundColor(.secondary)
                     
-                    // 👇 4. 修改：将原本的文字提示改为导出按钮
                     Button {
-                        exportAllData()
+                        startExportProcess()
                     } label: {
                         HStack {
                             Label("全部数据导出", systemImage: "square.and.arrow.up")
                             Spacer()
-                            // 提示用户点击后会发生什么
-                            Text("导出卡片与账单")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                            
+                            if isExporting {
+                                ProgressView()
+                                    .padding(.leading, 5)
+                            } else {
+                                Text("导出卡片与账单")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
-                    // 绑定分享面板
-                    .sheet(isPresented: $showShareSheet) {
-                        ActivityViewController(activityItems: exportItems)
-                            .presentationDetents([.medium, .large])
-                    }
+                    .disabled(isExporting) // 导出过程中禁止重复点击
                 }
                 
+                // About Section
                 Section(header: Text("关于 Cashback Counter")) {
                     HStack {
                         Label("版本", systemImage: "info.circle")
@@ -136,6 +152,7 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Reset Section
                 Section {
                     Button(role: .destructive) {
                         showConfirmClear = true
@@ -157,11 +174,43 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
             .listStyle(.insetGrouped)
+            // 4. 关键修复：使用 item: $shareData 绑定
+            // 只有当 shareData 有值时，才会初始化并显示 ActivityViewController
+            .sheet(item: $shareData) { data in
+                ActivityViewController(activityItems: data.items)
+                    .presentationDetents([.medium, .large])
+            }
         }
     }
     
-    // 👇 5. 新增：执行导出的逻辑
-    private func exportAllData() {
+    // MARK: - Logic Methods
+    
+    /// 开始异步导出流程
+    private func startExportProcess() {
+        // 1. 开启 Loading 状态
+        isExporting = true
+        
+        Task {
+            // 2. 稍微延迟一点点 (0.2秒)，让 UI 有机会刷新出 ProgressView
+            // 否则在主线程做繁重工作会直接卡住 UI，连转圈都看不到
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            
+            // 3. 执行导出数据生成 (耗时操作)
+            let items = generateExportItems()
+            
+            // 4. 完成后更新 UI 状态
+            // Task 在 SwiftUI View 中默认运行在 MainActor，所以可以直接更新 State
+            isExporting = false
+            
+            if !items.isEmpty {
+                // 赋值给 shareData，自动触发 .sheet(item: ...)
+                self.shareData = ShareData(items: items)
+            }
+        }
+    }
+    
+    /// 生成导出文件 (CSV + ZIP)
+    private func generateExportItems() -> [Any] {
         var items: [Any] = []
         
         // A. 导出卡片 CSV
@@ -169,16 +218,12 @@ struct SettingsView: View {
             items.append(cardCSV)
         }
         
-        // B. 导出账单+收据 ZIP (使用你之前写好的新方法)
+        // B. 导出账单+收据 ZIP
         if let backupZip = transactions.exportReceiptsZip() {
             items.append(backupZip)
         }
         
-        // C. 显示分享面板
-        if !items.isEmpty {
-            self.exportItems = items
-            self.showShareSheet = true
-        }
+        return items
     }
     
     private func clearAllData() {
@@ -201,7 +246,7 @@ struct SettingsView: View {
     }
 }
 
-// 👇 6. 新增：UIActivityViewController 的 SwiftUI 封装
+// MARK: - ActivityViewController
 struct ActivityViewController: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil

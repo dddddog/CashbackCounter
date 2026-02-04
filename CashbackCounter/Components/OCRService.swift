@@ -76,7 +76,7 @@ struct OCRService {
         if upperText.contains("合計") || upperText.contains("料金") { return .jp }
         if upperText.contains("HONG KONG") { return .hk }
         if upperText.contains("TAIPEI") || text.contains("台灣") { return .tw }
-        if upperText.contains("USA") || upperText.contains("US$") { return .us } // 美国小票常有 TAX
+        if upperText.contains("USA") || upperText.contains("US$") { return .us }
         
         // 3. 符号特征 (¥ 比较难办，中日都用，默认不处理或按概率给一个)
         if text.contains("金额") || text.contains("交易") { return .cn }
