@@ -18,6 +18,7 @@ struct ContentView: View {
                 }
                 .tag(0)
             
+            
             // --- 中间：拍照/记账页 ---
             CameraRecordView()
                 .tabItem {
@@ -34,14 +35,22 @@ struct ContentView: View {
                 }
                 .tag(2)
             
+            // --- 结单分析页 ---
+            StatementAnalysisEntryView()
+                .tabItem {
+                    Image(systemName: selectedTab == 3 ? "chart.bar.doc.horizontal.fill" : "chart.bar.doc.horizontal")
+                    Text("结单")
+                }
+                .tag(3)
+            
             // --- ✨ 新增：设置页 ---
             SettingsView()
                 .tabItem {
                     // 选中时变成实心齿轮
-                    Image(systemName: selectedTab == 3 ? "gearshape.fill" : "gearshape")
+                    Image(systemName: selectedTab == 4 ? "gearshape.fill" : "gearshape")
                     Text("设置")
                 }
-                .tag(3)
+                .tag(4)
         }
         .tint(.blue) // 设置底部选中时的颜色 (Apple 蓝)
     }

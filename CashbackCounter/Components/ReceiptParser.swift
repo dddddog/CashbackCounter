@@ -69,6 +69,21 @@ final class ReceiptParser {
         "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera." // 👈 新增：友都八喜/Bic Camera
         "- 'other': Anything that doesn't fit above."
     }
+
+    private let statementCardInstructions = Instructions{
+        "You are an expert credit card statement parser."
+        "Extract the card product name and the last 4 digits of the card."
+        "If a field is missing, return nil for it."
+        "Do not guess. Use only information present in the statement text."
+    }
+
+    private let statementTransactionInstructions = Instructions{
+        "You are an expert transaction classifier."
+        "Infer transaction region, payment method, and category from the provided transaction summary."
+        "Use merchant name, currency code/symbols, and context words to infer region."
+        "Use payment hints such as Apple Pay, online, QR, tap, NFC, or card present/online words."
+        "If unsure, return nil for the field."
+    }
     
     init() {}
     
@@ -85,8 +100,11 @@ final class ReceiptParser {
                 "Analyze this receipt text:"
                 text
             }
-            
-        return response.content
+
+        let metadata = response.content
+        let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), currency=\(metadata.currency ?? "nil"), date=\(metadata.dateString ?? "nil"), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
         }
     func SMSparse(text: String) async throws -> ReceiptMetadata {
             
@@ -100,8 +118,39 @@ final class ReceiptParser {
                 "Analyze this receipt text:"
                 text
             }
-            
-        return response.content
+
+        let metadata = response.content
+        let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("SMS OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
         }
+
+    func parseStatementCard(text: String) async throws -> StatementCardMetadata {
+        let session = LanguageModelSession(instructions: statementCardInstructions)
+        let response = try await session.respond(
+            generating: StatementCardMetadata.self
+        ) {
+            "Analyze this statement text:"
+            text
+        }
+
+        let metadata = response.content
+        print("Statement OCR fields: cardLast4=\(metadata.cardLast4 ?? "nil"), cardName=\(metadata.cardName ?? "nil")")
+        return metadata
+    }
+
+    func parseStatementTransaction(text: String) async throws -> StatementTransactionMetadata {
+        let session = LanguageModelSession(instructions: statementTransactionInstructions)
+        let response = try await session.respond(
+            generating: StatementTransactionMetadata.self
+        ) {
+            "Analyze this transaction summary:"
+            text
+        }
+
+        let metadata = response.content
+        print("Statement OCR fields: region=\(metadata.region?.rawValue ?? "nil"), payment=\(metadata.paymentMethod?.rawValue ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
+    }
     
 }

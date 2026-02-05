@@ -10,6 +10,7 @@ struct AddTransactionView: View {
     // 2. 回调与编辑对象
     var onSaved: (() -> Void)? = nil
     var transactionToEdit: Transaction?
+    private let prefillCardLast4: String?
     
     // --- 表单的状态变量 ---
     @State private var merchant: String = ""
@@ -31,9 +32,22 @@ struct AddTransactionView: View {
 
     
     // --- 3. 自定义初始化 ---
-    init(transaction: Transaction? = nil, image: UIImage? = nil, onSaved: (() -> Void)? = nil) {
+    init(
+        transaction: Transaction? = nil,
+        image: UIImage? = nil,
+        prefillMerchant: String? = nil,
+        prefillAmount: Double? = nil,
+        prefillBillingAmount: Double? = nil,
+        prefillDate: Date? = nil,
+        prefillCategory: Category? = nil,
+        prefillLocation: Region? = nil,
+        prefillPaymentMethod: PaymentMethod? = nil,
+        prefillCardLast4: String? = nil,
+        onSaved: (() -> Void)? = nil
+    ) {
         self.transactionToEdit = transaction
         self.onSaved = onSaved
+        self.prefillCardLast4 = prefillCardLast4
         
         if let t = transaction {
             // 编辑模式
@@ -52,6 +66,38 @@ struct AddTransactionView: View {
         } else {
             // 新建模式
             _receiptImage = State(initialValue: image)
+            
+            if let prefillMerchant {
+                _merchant = State(initialValue: prefillMerchant)
+            }
+            
+            let displayAmount = prefillAmount ?? prefillBillingAmount
+            if let displayAmount {
+                let formattedAmount = String(format: "%.2f", displayAmount)
+                _amount = State(initialValue: formattedAmount)
+            }
+
+            if let prefillBillingAmount {
+                _billingAmountStr = State(initialValue: String(format: "%.2f", prefillBillingAmount))
+            } else if let displayAmount {
+                _billingAmountStr = State(initialValue: String(format: "%.2f", displayAmount))
+            }
+            
+            if let prefillDate {
+                _date = State(initialValue: prefillDate)
+            }
+
+            if let prefillCategory {
+                _selectedCategory = State(initialValue: prefillCategory)
+            }
+
+            if let prefillLocation {
+                _location = State(initialValue: prefillLocation)
+            }
+
+            if let prefillPaymentMethod {
+                _paymentMethod = State(initialValue: prefillPaymentMethod)
+            }
         }
     }
     
@@ -219,11 +265,17 @@ struct AddTransactionView: View {
                 if let t = transactionToEdit, let card = t.card,
                    let index = cards.firstIndex(of: card) {
                     selectedCardIndex = index
-                } else if receiptImage != nil && amount.isEmpty {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        analyzeReceipt()
+                } else {
+                    applyPrefillCardSelection()
+                    if receiptImage != nil && amount.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            analyzeReceipt()
+                        }
                     }
                 }
+            }
+            .onChange(of: cards.count) { _, _ in
+                applyPrefillCardSelection()
             }
             .onChange(of: receiptImage) { _, newImage in
                 if newImage != nil { analyzeReceipt() }
@@ -239,6 +291,13 @@ struct AddTransactionView: View {
     }
     
     // --- 4. AI 分析逻辑 (保持不变，或在此处根据 metadata 自动推断 paymentMethod) ---
+    private func applyPrefillCardSelection() {
+        guard transactionToEdit == nil else { return }
+        guard let prefillCardLast4 else { return }
+        guard let index = cards.firstIndex(where: { $0.endNum == prefillCardLast4 }) else { return }
+        selectedCardIndex = index
+    }
+
     func analyzeReceipt() {
         // ... (保持你原有的逻辑不变) ...
         guard let image = receiptImage else { return }
@@ -393,7 +452,6 @@ struct AddTransactionView: View {
             billingAmountStr = amount
             return
         }
-        guard transactionToEdit == nil else { return }
         
         Task {
             do {

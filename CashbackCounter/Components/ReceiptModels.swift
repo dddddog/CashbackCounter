@@ -44,3 +44,24 @@ struct SMSMetadata {
     @Guide(description: "Classify the receipt into one of the categories based on the merchant and items")
     var category: Category?
 }
+
+@Generable
+struct StatementCardMetadata {
+    @Guide(description: "The last 4 digits of the statement card. Return only digits if available.")
+    var cardLast4: String?
+
+    @Guide(description: "The card product name or bank name if available.")
+    var cardName: String?
+}
+
+@Generable
+struct StatementTransactionMetadata {
+    @Guide(description: "Transaction region. Choose from: cn, hk, us, jp, nz, tw, other.")
+    var region: Region?
+
+    @Guide(description: "Payment method. Choose from: applePay, qrCode, offline, online, pulse, gba.")
+    var paymentMethod: PaymentMethod?
+
+    @Guide(description: "Category based on merchant and context.")
+    var category: Category?
+}
