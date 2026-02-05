@@ -81,7 +81,8 @@ struct StatementParser {
             .filter { !$0.isEmpty }
 
         let totalBalance = extractTotalBalance(from: fullText)
-        let transactions = parseTransactions(from: lines)
+        let statementDate = extractStatementDate(from: fullText)
+        let transactions = parseTransactions(from: lines, statementDate: statementDate)
 
         return StatementMetadata(
             totalBalance: totalBalance,
@@ -90,17 +91,13 @@ struct StatementParser {
         )
     }
 
-    private func parseTransactions(from lines: [String]) -> [ImportedTransaction] {
+    private func parseTransactions(from lines: [String], statementDate: Date?) -> [ImportedTransaction] {
         var results: [ImportedTransaction] = []
         var currentBlock: [String] = []
 
-        let startRegex = regex("^(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\b")
-        let fullRegex = regex("^(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(.+?)\\s+(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)$")
-        let fullDoubleRegex = regex("^(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(.+?)\\s+(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)\\s+(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)$")
-
         for line in lines {
-            if matches(startRegex, in: line) {
-                if let transaction = parseTransactionBlock(currentBlock, fullRegex: fullRegex, extendedRegex: fullDoubleRegex) {
+            if isTransactionStart(line, statementDate: statementDate) {
+                if let transaction = parseTransactionBlock(currentBlock, statementDate: statementDate) {
                     results.append(transaction)
                 }
                 currentBlock = [line]
@@ -109,7 +106,7 @@ struct StatementParser {
             }
         }
 
-        if let transaction = parseTransactionBlock(currentBlock, fullRegex: fullRegex, extendedRegex: fullDoubleRegex) {
+        if let transaction = parseTransactionBlock(currentBlock, statementDate: statementDate) {
             results.append(transaction)
         }
 
@@ -118,8 +115,7 @@ struct StatementParser {
 
     private func parseTransactionBlock(
         _ blockLines: [String],
-        fullRegex: NSRegularExpression,
-        extendedRegex: NSRegularExpression
+        statementDate: Date?
     ) -> ImportedTransaction? {
         guard !blockLines.isEmpty else { return nil }
         let rawText = blockLines.joined(separator: "\n")
@@ -127,7 +123,7 @@ struct StatementParser {
 
         for line in blockLines {
             buffer = buffer.isEmpty ? line : buffer + " " + line
-            if let transaction = parseTransactionLine(buffer, using: fullRegex, extendedRegex: extendedRegex) {
+            if let transaction = parseTransactionLine(buffer, statementDate: statementDate) {
                 return applyRawText(rawText, to: transaction)
             }
         }
@@ -135,57 +131,47 @@ struct StatementParser {
         return nil
     }
 
-    private func parseTransactionLine(_ line: String, using regex: NSRegularExpression, extendedRegex: NSRegularExpression) -> ImportedTransaction? {
-        if let transaction = parseTransactionLine(line, match: extendedRegex, expectsTwoAmounts: true) {
-            return transaction
-        }
-        return parseTransactionLine(line, match: regex, expectsTwoAmounts: false)
-    }
+    private func parseTransactionLine(_ line: String, statementDate: Date?) -> ImportedTransaction? {
+        let tokens = line.split(whereSeparator: { $0.isWhitespace })
+        guard tokens.count >= 4 else { return nil }
 
-    private func parseTransactionLine(_ line: String, match regex: NSRegularExpression, expectsTwoAmounts: Bool) -> ImportedTransaction? {
-        let range = NSRange(line.startIndex..<line.endIndex, in: line)
-        guard let match = regex.firstMatch(in: line, range: range) else { return nil }
-        guard match.numberOfRanges == (expectsTwoAmounts ? 6 : 5) else { return nil }
-
-        guard let transactionDateString = rangeString(match.range(at: 1), in: line),
-              let postDateString = rangeString(match.range(at: 2), in: line),
-              let descriptionString = rangeString(match.range(at: 3), in: line),
-              let amountString = rangeString(match.range(at: 4), in: line) else {
+        guard let (postDate, indexAfterPost) = consumeDate(from: tokens, startingAt: 0, statementDate: statementDate),
+              let (transactionDate, indexAfterTransaction) = consumeDate(from: tokens, startingAt: indexAfterPost, statementDate: statementDate) else {
             return nil
         }
 
-        let secondAmountString: String?
-        if expectsTwoAmounts {
-            secondAmountString = rangeString(match.range(at: 5), in: line)
-        } else {
-            secondAmountString = nil
+        var nextIndex = indexAfterTransaction
+        if let (duplicatePost, dupIndex) = consumeDate(from: tokens, startingAt: nextIndex, statementDate: statementDate),
+           let (duplicateTransaction, dupIndex2) = consumeDate(from: tokens, startingAt: dupIndex, statementDate: statementDate) {
+            let calendar = Calendar.current
+            let dupMatchesPost = calendar.isDate(duplicatePost, inSameDayAs: postDate)
+            let dupMatchesTransaction = calendar.isDate(duplicatePost, inSameDayAs: transactionDate)
+            let dupSecondMatchesPost = calendar.isDate(duplicateTransaction, inSameDayAs: postDate)
+            let dupSecondMatchesTransaction = calendar.isDate(duplicateTransaction, inSameDayAs: transactionDate)
+
+            if (dupMatchesPost && dupSecondMatchesTransaction) ||
+                (dupMatchesTransaction && dupSecondMatchesPost) ||
+                (dupMatchesPost && dupSecondMatchesPost) {
+                nextIndex = dupIndex2
+            }
         }
 
-        guard let transactionDate = Self.statementDateFormatter.date(from: transactionDateString),
-              let postDate = Self.statementDateFormatter.date(from: postDateString) else {
-            return nil
-        }
+        let remainderTokens = Array(tokens.dropFirst(nextIndex))
+        guard let parsed = splitAmounts(from: remainderTokens) else { return nil }
+        guard let billingAmount = parsed.amounts.last else { return nil }
 
-        let transactionAmount = parseAmount(amountString)
-        let billingAmount: Double?
-        if let secondAmountString {
-            billingAmount = parseAmount(secondAmountString)
-        } else {
-            billingAmount = transactionAmount
-        }
+        let cleanedDescription = parsed.description.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        guard !cleanedDescription.isEmpty else { return nil }
+        guard !shouldIgnoreTransaction(cleanedDescription) else { return nil }
 
-        guard let finalBilling = billingAmount else { return nil }
-
-        let cleanedDescription = descriptionString.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         let extracted = extractForeignDetails(from: cleanedDescription)
-
         var merchant = extracted.merchant
         var foreignAmount = extracted.amount
         let foreignCurrency = extracted.currency
 
         if foreignAmount == nil {
-            if expectsTwoAmounts, let transactionAmount {
-                foreignAmount = transactionAmount
+            if parsed.amounts.count >= 2 {
+                foreignAmount = parsed.amounts[parsed.amounts.count - 2]
             } else if let trailing = extractTrailingAmount(from: merchant) {
                 merchant = trailing.merchant
                 foreignAmount = trailing.amount
@@ -198,10 +184,224 @@ struct StatementParser {
             transactionDate: transactionDate,
             postDate: postDate,
             merchant: merchant,
-            billingAmount: finalBilling,
+            billingAmount: billingAmount,
             foreignAmount: foreignAmount,
             foreignCurrency: foreignCurrency
         )
+    }
+
+    private func isTransactionStart(_ line: String, statementDate: Date?) -> Bool {
+        let tokens = line.split(whereSeparator: { $0.isWhitespace })
+        guard tokens.count >= 2 else { return false }
+        guard let (_, indexAfterPost) = consumeDate(from: tokens, startingAt: 0, statementDate: statementDate) else { return false }
+        guard consumeDate(from: tokens, startingAt: indexAfterPost, statementDate: statementDate) != nil else { return false }
+        return true
+    }
+
+    private func extractStatementDate(from text: String) -> Date? {
+        let lines = text.components(separatedBy: .newlines)
+        let datePattern = regex("(\\d{1,2}\\s*[A-Za-z]{3}\\s*\\d{2,4}|\\d{1,2}[A-Za-z]{3}\\d{2,4}|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}|\\d{4}-\\d{1,2}-\\d{1,2})")
+
+        for line in lines {
+            let lower = line.lowercased()
+            guard lower.contains("statement date") else { continue }
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            let matches = datePattern.matches(in: line, range: range)
+            for match in matches {
+                guard let candidate = rangeString(match.range(at: 1), in: line) else { continue }
+                if let date = parseDateToken(candidate, statementDate: nil) {
+                    return date
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func consumeDate(
+        from tokens: [Substring],
+        startingAt index: Int,
+        statementDate: Date?
+    ) -> (date: Date, nextIndex: Int)? {
+        guard index < tokens.count else { return nil }
+        let maxIndex = tokens.count - 1
+
+        let candidates: [(String, Int)] = [
+            index + 2 <= maxIndex ? (String(tokens[index]) + String(tokens[index + 1]) + String(tokens[index + 2]), 3) : ("", 0),
+            index + 2 <= maxIndex ? (String(tokens[index]) + " " + String(tokens[index + 1]) + " " + String(tokens[index + 2]), 3) : ("", 0),
+            index + 1 <= maxIndex ? (String(tokens[index]) + String(tokens[index + 1]), 2) : ("", 0),
+            index + 1 <= maxIndex ? (String(tokens[index]) + " " + String(tokens[index + 1]), 2) : ("", 0),
+            (String(tokens[index]), 1)
+        ]
+
+        for (candidate, length) in candidates where length > 0 {
+            if let date = parseDateToken(candidate, statementDate: statementDate) {
+                return (date: date, nextIndex: index + length)
+            }
+        }
+
+        return nil
+    }
+
+    private func parseDateToken(_ token: String, statementDate: Date?) -> Date? {
+        let trimmed = token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ",."))
+        guard !trimmed.isEmpty else { return nil }
+
+        for formatter in Self.numericDateFormatters {
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+
+        let compact = trimmed
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .uppercased()
+        if let date = parseMonthAbbreviationDate(compact, statementDate: statementDate) {
+            return date
+        }
+
+        if let date = parseSlashDateWithoutYear(trimmed, statementDate: statementDate) {
+            return date
+        }
+
+        return nil
+    }
+
+    private func parseMonthAbbreviationDate(_ token: String, statementDate: Date?) -> Date? {
+        let pattern = regex("^(\\d{1,2})([A-Z]{3})(\\d{2,4})?$")
+        let range = NSRange(token.startIndex..<token.endIndex, in: token)
+        guard let match = pattern.firstMatch(in: token, range: range), match.numberOfRanges >= 3 else { return nil }
+        guard let dayString = rangeString(match.range(at: 1), in: token),
+              let monthString = rangeString(match.range(at: 2), in: token) else { return nil }
+
+        let monthMap: [String: Int] = [
+            "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+            "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12
+        ]
+        guard let day = Int(dayString), let month = monthMap[monthString] else { return nil }
+
+        let year: Int
+        if match.numberOfRanges >= 4, let yearString = rangeString(match.range(at: 3), in: token), !yearString.isEmpty {
+            year = normalizeYear(from: yearString)
+        } else {
+            year = inferredYear(for: month, statementDate: statementDate)
+        }
+
+        return makeDate(day: day, month: month, year: year)
+    }
+
+    private func parseSlashDateWithoutYear(_ token: String, statementDate: Date?) -> Date? {
+        let parts = token.split(separator: "/")
+        guard parts.count == 2 else { return nil }
+        guard let first = Int(parts[0]), let second = Int(parts[1]) else { return nil }
+
+        let day: Int
+        let month: Int
+        if first > 12 {
+            day = first
+            month = second
+        } else if second > 12 {
+            day = second
+            month = first
+        } else {
+            day = first
+            month = second
+        }
+
+        let year = inferredYear(for: month, statementDate: statementDate)
+        return makeDate(day: day, month: month, year: year)
+    }
+
+    private func normalizeYear(from string: String) -> Int {
+        if string.count == 2, let year = Int(string) {
+            return 2000 + year
+        }
+        return Int(string) ?? Calendar.current.component(.year, from: Date())
+    }
+
+    private func inferredYear(for month: Int, statementDate: Date?) -> Int {
+        let calendar = Calendar.current
+        let baseYear = statementDate.map { calendar.component(.year, from: $0) } ?? calendar.component(.year, from: Date())
+        guard let statementDate else { return baseYear }
+        let statementMonth = calendar.component(.month, from: statementDate)
+        if month - statementMonth >= 6 {
+            return baseYear - 1
+        }
+        return baseYear
+    }
+
+    private func makeDate(day: Int, month: Int, year: Int) -> Date? {
+        var components = DateComponents()
+        components.day = day
+        components.month = month
+        components.year = year
+        return Calendar.current.date(from: components)
+    }
+
+    private func splitAmounts(from tokens: [Substring]) -> (description: String, amounts: [Double])? {
+        guard !tokens.isEmpty else { return nil }
+        var amounts: [Double] = []
+        var amountStartIndex: Int?
+        var index = tokens.count - 1
+        var pendingCredit = false
+
+        while index >= 0 {
+            let token = tokens[index]
+            let upper = token.uppercased()
+
+            if upper == "CR" || upper == "CREDIT" {
+                pendingCredit = true
+                index -= 1
+                continue
+            }
+
+            if isCurrencyToken(token) {
+                index -= 1
+                continue
+            }
+
+            if let amount = parseAmountToken(token, forceNegative: pendingCredit) {
+                amounts.insert(amount, at: 0)
+                pendingCredit = false
+                amountStartIndex = index
+                index -= 1
+                continue
+            }
+
+            if !amounts.isEmpty {
+                break
+            }
+            index -= 1
+        }
+
+        guard let startIndex = amountStartIndex else { return nil }
+
+        var descriptionTokens = Array(tokens[..<startIndex])
+        while let last = descriptionTokens.last, isCurrencyToken(last) {
+            descriptionTokens.removeLast()
+        }
+        let description = descriptionTokens.joined(separator: " ")
+        return (description: description, amounts: amounts)
+    }
+
+    private func isCurrencyToken(_ token: Substring) -> Bool {
+        let upper = token.uppercased()
+        let currencies = ["HKD", "USD", "SGD", "JPY", "CNY", "RMB", "EUR", "GBP", "AUD", "CAD", "TWD", "$", "HK$", "US$"]
+        return currencies.contains(upper)
+    }
+
+    private func parseAmountToken(_ token: Substring, forceNegative: Bool) -> Double? {
+        guard let parsed = parseAmount(String(token)) else { return nil }
+        return forceNegative ? -abs(parsed) : parsed
+    }
+
+    private func shouldIgnoreTransaction(_ description: String) -> Bool {
+        let upper = description.uppercased()
+        let ignoreKeywords = ["PREVIOUS BALANCE", "BALANCE FORWARD"]
+        return ignoreKeywords.contains(where: { upper.contains($0) })
     }
 
     private func applyRawText(_ rawText: String, to transaction: ImportedTransaction) -> ImportedTransaction {
@@ -221,7 +421,7 @@ struct StatementParser {
     }
 
     private func extractTrailingAmount(from text: String) -> (merchant: String, amount: Double)? {
-        let trailingRegex = regex("^(.*?)(?:\\s+)(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)$")
+        let trailingRegex = regex("^(.*?)(?:\\s+)(" + amountPattern + ")$")
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = trailingRegex.firstMatch(in: text, range: range), match.numberOfRanges == 3 else {
             return nil
@@ -235,7 +435,7 @@ struct StatementParser {
     }
 
     private func extractSecondaryAmount(from text: String) -> Double? {
-        let amountRegex = regex("-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?")
+        let amountRegex = regex(amountPattern)
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         let matches = amountRegex.matches(in: text, range: range)
         guard matches.count >= 2 else { return nil }
@@ -259,7 +459,7 @@ struct StatementParser {
     }
 
     private func extractFirstAmount(from text: String) -> Double? {
-        let amountRegex = regex("-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?")
+        let amountRegex = regex(amountPattern)
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = amountRegex.firstMatch(in: text, range: range) else { return nil }
         guard let amountString = rangeString(match.range(at: 0), in: text) else { return nil }
@@ -306,8 +506,14 @@ struct StatementParser {
     }
 
     private func parseAmount(_ raw: String) -> Double? {
-        var text = raw.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: "$", with: "")
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         var isNegative = false
+
+        let upper = text.uppercased()
+        if upper.contains("CR") {
+            isNegative = true
+            text = text.replacingOccurrences(of: "CR", with: "", options: .caseInsensitive)
+        }
 
         if text.contains("(") && text.contains(")") {
             isNegative = true
@@ -320,7 +526,14 @@ struct StatementParser {
             text.removeFirst()
         }
 
-        guard let value = Double(text) else { return nil }
+        text = text
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: "HK$", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "US$", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "$", with: "")
+
+        let filtered = text.filter { $0.isNumber || $0 == "." }
+        guard let value = Double(filtered) else { return nil }
         return isNegative ? -value : value
     }
 
@@ -338,11 +551,16 @@ struct StatementParser {
         return (try? NSRegularExpression(pattern: pattern, options: [])) ?? (try! NSRegularExpression(pattern: "(?!)"))
     }
 
-    private static let statementDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd/yy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        return formatter
+    private static let numericDateFormatters: [DateFormatter] = {
+        let formats = ["MM/dd/yy", "MM/dd/yyyy", "dd/MM/yy", "dd/MM/yyyy", "yyyy-MM-dd"]
+        return formats.map { format in
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            return formatter
+        }
     }()
+
+    private let amountPattern = "-?[A-Za-z$]{0,4}\\s*\\(?[\\d,]+\\.\\d{2}\\)?(?:[cC][rR])?"
 }
