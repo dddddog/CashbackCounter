@@ -81,7 +81,17 @@ final class ReceiptParser {
         "You are an expert transaction classifier."
         "Infer transaction region, payment method, and category from the provided transaction summary."
         "Use merchant name, currency code/symbols, and context words to infer region."
+        "CRITICAL RULES FOR CATEGORIZATION:"
+        "- Analyze the merchant name and items purchased."
+        "- 'dining': Restaurants, Cafes, Starbucks, Izakaya (居酒屋), Ramen (ラーメン)." // 👈 新增：居酒屋/拉面
+        "- 'grocery': Supermarkets, 7-Eleven, Lawson, FamilyMart, Daily necessities." // 👈 新增：日本常见便利店
+        "- 'travel': Uber, Taxi, Flights, Hotels, Suica, Pasmo, Shinkansen (新幹線)." // 👈 新增：西瓜卡/新干线
+        "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera." // 👈 新增：友都八喜/Bic Camera
+        "- 'other': Anything that doesn't fit above."
         "Use payment hints such as Apple Pay, online, QR, tap, NFC, or card present/online words."
+        "Extract the original transaction amount in foreign currency if the statement shows exchange details."
+        "If there is a line like '65.00 X 0.03184615' or a foreign currency section, return 65.00 as foreignAmount (not the rate)."
+        "Do not return the billing/settlement amount as foreignAmount."
         "If unsure, return nil for the field."
     }
     
@@ -149,7 +159,9 @@ final class ReceiptParser {
         }
 
         let metadata = response.content
-        print("Statement OCR fields: region=\(metadata.region?.rawValue ?? "nil"), payment=\(metadata.paymentMethod?.rawValue ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        print("TEXT",text)
+        let foreignAmountText = metadata.foreignAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("Statement OCR fields: foreignAmount=\(foreignAmountText), payment=\(metadata.paymentMethod?.rawValue ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
         return metadata
     }
     

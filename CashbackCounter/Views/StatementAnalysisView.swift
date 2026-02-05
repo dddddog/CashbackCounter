@@ -284,14 +284,25 @@ struct StatementAnalysisView: View {
         let parser = ReceiptParser()
 
         for transaction in statement.transactions {
-            let prompt = transactionSummaryText(for: transaction)
+            if let matchedTransaction = matchedTransaction(for: transaction) {
+                let enriched = transaction.withAnalysis(
+                    region: matchedTransaction.location,
+                    paymentMethod: matchedTransaction.paymentMethod,
+                    category: matchedTransaction.category,
+                    foreignAmount: matchedTransaction.amount
+                )
+                updated.append(enriched)
+                continue
+            }
+
+            let prompt = transactionPromptText(for: transaction)
             do {
                 let metadata = try await parser.parseStatementTransaction(text: prompt)
-                print("Statement OCR fields: merchant=\(transaction.merchant), region=\(metadata.region?.rawValue ?? "nil"), payment=\(metadata.paymentMethod?.rawValue ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
                 let enriched = transaction.withAnalysis(
                     region: metadata.region,
                     paymentMethod: metadata.paymentMethod,
-                    category: metadata.category
+                    category: metadata.category,
+                    foreignAmount: metadata.foreignAmount
                 )
                 updated.append(enriched)
             } catch {
@@ -310,23 +321,47 @@ struct StatementAnalysisView: View {
         await analyzeTransactions()
     }
 
-    private func transactionSummaryText(for transaction: ImportedTransaction) -> String {
+    private func transactionPromptText(for transaction: ImportedTransaction) -> String {
         let dateText = Self.transactionDateFormatter.string(from: transaction.transactionDate)
         var lines: [String] = [
             "Merchant: \(transaction.merchant)",
-            "Amount: \(String(format: "%.2f", transaction.billingAmount))",
-            "Date: \(dateText)"
+            "BillingAmount: \(String(format: "%.2f", transaction.billingAmount))",
         ]
 
-        if let currency = transaction.foreignCurrency, let amount = transaction.foreignAmount {
+        if let currency = transaction.region?.currencyCode, let amount = transaction.foreignAmount {
             lines.append("Foreign: \(currency) \(String(format: "%.2f", amount))")
         }
 
-        if let detectedCardText, !detectedCardText.isEmpty {
-            lines.append("Statement card: \(detectedCardText)")
+        if let rawText = transaction.rawText, !rawText.isEmpty {
+            var trimmed = rawText
+            let maxChars = 1200
+            if trimmed.count > maxChars {
+                trimmed = String(trimmed.prefix(maxChars))
+            }
+            lines.append("Statement block:\n\(trimmed)")
         }
 
+
         return lines.joined(separator: "\n")
+    }
+
+    private func matchedTransaction(for imported: ImportedTransaction) -> Transaction? {
+        let calendar = Calendar.current
+        return transactions.first { transaction in
+            amountsMatch(imported.billingAmount, transaction.billingAmount) &&
+            datesWithinRange(imported.transactionDate, transaction.date, calendar: calendar)
+        }
+    }
+
+    private func amountsMatch(_ lhs: Double, _ rhs: Double) -> Bool {
+        abs(lhs - rhs) < 0.0001
+    }
+
+    private func datesWithinRange(_ lhs: Date, _ rhs: Date, calendar: Calendar) -> Bool {
+        let leftDay = calendar.startOfDay(for: lhs)
+        let rightDay = calendar.startOfDay(for: rhs)
+        let dayDiff = calendar.dateComponents([.day], from: leftDay, to: rightDay).day ?? Int.max
+        return abs(dayDiff) <= 3
     }
 
     private func statementCardPromptText(from fullText: String) -> String {
@@ -546,7 +581,7 @@ private struct ReconciliationRow: View {
 
     private var foreignAmountText: String? {
         guard let amount = transaction.foreignAmount,
-              let currency = transaction.foreignCurrency else {
+              let currency = transaction.region?.currencyCode else {
             return nil
         }
         return "\(currency) \(String(format: "%.2f", amount))"
@@ -606,18 +641,27 @@ private struct DateBadge: View {
     }()
 }
 private extension ImportedTransaction {
-    func withAnalysis(region: Region?, paymentMethod: PaymentMethod?, category: Category?) -> ImportedTransaction {
-        ImportedTransaction(
+    func withAnalysis(
+        region: Region?,
+        paymentMethod: PaymentMethod?,
+        category: Category?,
+        foreignAmount: Double?
+    ) -> ImportedTransaction {
+        let resolvedForeignAmount = foreignAmount ?? self.foreignAmount
+        let resolvedRegion = region ?? self.region
+        let resolvedForeignCurrency = resolvedRegion?.currencyCode
+        return ImportedTransaction(
             id: id,
             transactionDate: transactionDate,
             postDate: postDate,
             merchant: merchant,
             billingAmount: billingAmount,
-            foreignAmount: foreignAmount,
-            foreignCurrency: foreignCurrency,
+            foreignAmount: resolvedForeignAmount,
+            foreignCurrency: resolvedForeignCurrency,
             region: region,
             paymentMethod: paymentMethod,
-            category: category
+            category: category,
+            rawText: rawText
         )
     }
 }

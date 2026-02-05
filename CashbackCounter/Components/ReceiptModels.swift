@@ -64,4 +64,8 @@ struct StatementTransactionMetadata {
 
     @Guide(description: "Category based on merchant and context.")
     var category: Category?
+
+    @Guide(description: "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present.")
+    var foreignAmount: Double?
+
 }

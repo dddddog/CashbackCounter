@@ -34,6 +34,7 @@ struct ImportedTransaction: Identifiable, Hashable {
     let region: Region?
     let paymentMethod: PaymentMethod?
     let category: Category?
+    let rawText: String?
 
     init(
         id: UUID = UUID(),
@@ -45,7 +46,8 @@ struct ImportedTransaction: Identifiable, Hashable {
         foreignCurrency: String? = nil,
         region: Region? = nil,
         paymentMethod: PaymentMethod? = nil,
-        category: Category? = nil
+        category: Category? = nil,
+        rawText: String? = nil
     ) {
         self.id = id
         self.transactionDate = transactionDate
@@ -57,6 +59,7 @@ struct ImportedTransaction: Identifiable, Hashable {
         self.region = region
         self.paymentMethod = paymentMethod
         self.category = category
+        self.rawText = rawText
     }
 }
 
@@ -89,7 +92,7 @@ struct StatementParser {
 
     private func parseTransactions(from lines: [String]) -> [ImportedTransaction] {
         var results: [ImportedTransaction] = []
-        var buffer: String? = nil
+        var currentBlock: [String] = []
 
         let startRegex = regex("^(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\b")
         let fullRegex = regex("^(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(.+?)\\s+(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)$")
@@ -97,32 +100,39 @@ struct StatementParser {
 
         for line in lines {
             if matches(startRegex, in: line) {
-                if let buffered = buffer, let transaction = parseTransactionLine(buffered, using: fullRegex, extendedRegex: fullDoubleRegex) {
+                if let transaction = parseTransactionBlock(currentBlock, fullRegex: fullRegex, extendedRegex: fullDoubleRegex) {
                     results.append(transaction)
                 }
-
-                if let transaction = parseTransactionLine(line, using: fullRegex, extendedRegex: fullDoubleRegex) {
-                    results.append(transaction)
-                    buffer = nil
-                } else {
-                    buffer = line
-                }
-            } else if var buffered = buffer {
-                buffered += " " + line
-                if let transaction = parseTransactionLine(buffered, using: fullRegex, extendedRegex: fullDoubleRegex) {
-                    results.append(transaction)
-                    buffer = nil
-                } else {
-                    buffer = buffered
-                }
+                currentBlock = [line]
+            } else if !currentBlock.isEmpty {
+                currentBlock.append(line)
             }
         }
 
-        if let buffered = buffer, let transaction = parseTransactionLine(buffered, using: fullRegex, extendedRegex: fullDoubleRegex) {
+        if let transaction = parseTransactionBlock(currentBlock, fullRegex: fullRegex, extendedRegex: fullDoubleRegex) {
             results.append(transaction)
         }
 
         return results
+    }
+
+    private func parseTransactionBlock(
+        _ blockLines: [String],
+        fullRegex: NSRegularExpression,
+        extendedRegex: NSRegularExpression
+    ) -> ImportedTransaction? {
+        guard !blockLines.isEmpty else { return nil }
+        let rawText = blockLines.joined(separator: "\n")
+        var buffer = ""
+
+        for line in blockLines {
+            buffer = buffer.isEmpty ? line : buffer + " " + line
+            if let transaction = parseTransactionLine(buffer, using: fullRegex, extendedRegex: extendedRegex) {
+                return applyRawText(rawText, to: transaction)
+            }
+        }
+
+        return nil
     }
 
     private func parseTransactionLine(_ line: String, using regex: NSRegularExpression, extendedRegex: NSRegularExpression) -> ImportedTransaction? {
@@ -169,19 +179,69 @@ struct StatementParser {
         let cleanedDescription = descriptionString.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         let extracted = extractForeignDetails(from: cleanedDescription)
 
+        var merchant = extracted.merchant
         var foreignAmount = extracted.amount
-        if foreignAmount == nil, expectsTwoAmounts {
-            foreignAmount = transactionAmount
+        let foreignCurrency = extracted.currency
+
+        if foreignAmount == nil {
+            if expectsTwoAmounts, let transactionAmount {
+                foreignAmount = transactionAmount
+            } else if let trailing = extractTrailingAmount(from: merchant) {
+                merchant = trailing.merchant
+                foreignAmount = trailing.amount
+            } else if let fallbackAmount = extractSecondaryAmount(from: line) {
+                foreignAmount = fallbackAmount
+            }
         }
 
         return ImportedTransaction(
             transactionDate: transactionDate,
             postDate: postDate,
-            merchant: extracted.merchant,
+            merchant: merchant,
             billingAmount: finalBilling,
             foreignAmount: foreignAmount,
-            foreignCurrency: extracted.currency
+            foreignCurrency: foreignCurrency
         )
+    }
+
+    private func applyRawText(_ rawText: String, to transaction: ImportedTransaction) -> ImportedTransaction {
+        ImportedTransaction(
+            id: transaction.id,
+            transactionDate: transaction.transactionDate,
+            postDate: transaction.postDate,
+            merchant: transaction.merchant,
+            billingAmount: transaction.billingAmount,
+            foreignAmount: transaction.foreignAmount,
+            foreignCurrency: transaction.foreignCurrency,
+            region: transaction.region,
+            paymentMethod: transaction.paymentMethod,
+            category: transaction.category,
+            rawText: rawText
+        )
+    }
+
+    private func extractTrailingAmount(from text: String) -> (merchant: String, amount: Double)? {
+        let trailingRegex = regex("^(.*?)(?:\\s+)(-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?)$")
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = trailingRegex.firstMatch(in: text, range: range), match.numberOfRanges == 3 else {
+            return nil
+        }
+        guard let merchant = rangeString(match.range(at: 1), in: text),
+              let amountString = rangeString(match.range(at: 2), in: text),
+              let amount = parseAmount(amountString) else {
+            return nil
+        }
+        return (merchant: merchant.trimmingCharacters(in: .whitespacesAndNewlines), amount: amount)
+    }
+
+    private func extractSecondaryAmount(from text: String) -> Double? {
+        let amountRegex = regex("-?\\$?\\(?[\\d,]+\\.\\d{2}\\)?")
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let matches = amountRegex.matches(in: text, range: range)
+        guard matches.count >= 2 else { return nil }
+        let targetIndex = matches.count - 2
+        guard let amountString = rangeString(matches[targetIndex].range, in: text) else { return nil }
+        return parseAmount(amountString)
     }
 
     private func extractTotalBalance(from text: String) -> Double? {

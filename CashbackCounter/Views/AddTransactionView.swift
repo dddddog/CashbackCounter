@@ -11,6 +11,7 @@ struct AddTransactionView: View {
     var onSaved: (() -> Void)? = nil
     var transactionToEdit: Transaction?
     private let prefillCardLast4: String?
+    private let shouldSkipRateUpdate: Bool
     
     // --- 表单的状态变量 ---
     @State private var merchant: String = ""
@@ -48,7 +49,8 @@ struct AddTransactionView: View {
         self.transactionToEdit = transaction
         self.onSaved = onSaved
         self.prefillCardLast4 = prefillCardLast4
-        
+        self.shouldSkipRateUpdate = transaction != nil || prefillBillingAmount != nil
+
         if let t = transaction {
             // 编辑模式
             _merchant = State(initialValue: t.merchant)
@@ -452,7 +454,8 @@ struct AddTransactionView: View {
             billingAmountStr = amount
             return
         }
-        
+        guard transactionToEdit == nil else { return }
+
         Task {
             do {
                 let rate = try await CurrencyService.fetchRate(from: sourceCurrency, to: targetCurrency)
