@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import UIKit
 
 struct StatementMetadata {
     let totalBalance: Double?
@@ -64,31 +65,195 @@ struct ImportedTransaction: Identifiable, Hashable {
 }
 
 struct StatementParser {
-    func parse(from url: URL) -> StatementMetadata? {
-        guard let document = PDFDocument(url: url) else { return nil }
-
-        var pageTexts: [String] = []
-        for index in 0..<document.pageCount {
-            guard let page = document.page(at: index) else { continue }
-            guard let text = page.string, !text.isEmpty else { continue }
-            pageTexts.append(text)
-        }
-
-        let fullText = pageTexts.joined(separator: "\n")
+    func parse(from url: URL) async -> StatementMetadata? {
+        guard let images = await renderPages(from: url) else { return nil }
+        let rows = await analyzeRows(from: images)
+        let fullText = fullText(from: rows)
         let lines = fullText
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
+        print("fulltest:",fullText)
         let totalBalance = extractTotalBalance(from: fullText)
         let statementDate = extractStatementDate(from: fullText)
-        let transactions = parseTransactions(from: lines, statementDate: statementDate)
+        let transactions = await parseTransactions(from: rows, fallbackLines: lines, statementDate: statementDate)
 
         return StatementMetadata(
             totalBalance: totalBalance,
             transactions: transactions,
             statementText: fullText
         )
+    }
+
+    private func analyzeRows(from images: [UIImage]) async -> [RecognizedRow] {
+        var allRows: [RecognizedRow] = []
+        let analyzer = StatementAnalyzer()
+        for image in images {
+            let rows = await analyzer.analyze(image: image)
+            allRows.append(contentsOf: rows)
+        }
+        return allRows
+    }
+
+    private func fullText(from rows: [RecognizedRow]) -> String {
+        rows.map(\.text).joined(separator: "\n")
+    }
+
+    private func parseTransactions(
+        from rows: [RecognizedRow],
+        fallbackLines: [String],
+        statementDate: Date?
+    ) async -> [ImportedTransaction] {
+        let modelResults = await parseTransactionsWithFoundationModel(from: rows, statementDate: statementDate)
+        if !modelResults.isEmpty {
+            return modelResults
+        }
+        return parseTransactions(from: fallbackLines, statementDate: statementDate)
+    }
+
+    private func parseTransactionsWithFoundationModel(
+        from rows: [RecognizedRow],
+        statementDate: Date?
+    ) async -> [ImportedTransaction] {
+        guard !rows.isEmpty else { return [] }
+        let blocks = groupRowsIntoTransactionBlocks(rows, statementDate: statementDate)
+        guard !blocks.isEmpty else { return [] }
+        let blockTexts = blocks.map { block in
+            block.map(\.text).joined(separator: "\n")
+        }
+
+        do {
+            let parsed = try await ReceiptParser().parseStatementTransactions(from: blockTexts)
+            return buildImportedTransactions(from: parsed, statementDate: statementDate)
+        } catch {
+            print("Statement row parse failed: \(error)")
+            return []
+        }
+    }
+
+    private func groupRowsIntoTransactionBlocks(
+        _ rows: [RecognizedRow],
+        statementDate: Date?
+    ) -> [[RecognizedRow]] {
+        var results: [[RecognizedRow]] = []
+        var current: [RecognizedRow] = []
+
+        for row in rows {
+            if isBlockStart(row.text, statementDate: statementDate) {
+                if !current.isEmpty {
+                    results.append(current)
+                }
+                current = [row]
+            } else if !current.isEmpty {
+                current.append(row)
+            }
+        }
+
+        if !current.isEmpty {
+            results.append(current)
+        }
+
+        return results
+    }
+
+    private func isBlockStart(_ line: String, statementDate: Date?) -> Bool {
+        if isTransactionStart(line, statementDate: statementDate) {
+            return true
+        }
+        return startsWithDate(line, statementDate: statementDate)
+    }
+
+    private func startsWithDate(_ line: String, statementDate: Date?) -> Bool {
+        let tokens = line.split(whereSeparator: { $0.isWhitespace })
+        guard let (_, indexAfter) = consumeDate(from: tokens, startingAt: 0, statementDate: statementDate) else {
+            return false
+        }
+        return indexAfter > 0
+    }
+
+    private func buildImportedTransactions(
+        from parsed: [StatementRowTransaction],
+        statementDate: Date?
+    ) -> [ImportedTransaction] {
+        var results: [ImportedTransaction] = []
+
+        for item in parsed {
+            let merchant = item.merchant?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !merchant.isEmpty else { continue }
+            guard let billingAmount = item.billingAmount else { continue }
+
+            let transactionDate = parseStatementDate(from: item.transactionDate, statementDate: statementDate)
+            let postDate = parseStatementDate(from: item.postDate, statementDate: statementDate)
+            guard let resolvedTransactionDate = transactionDate ?? postDate else { continue }
+            let resolvedPostDate = postDate ?? resolvedTransactionDate
+
+            let transaction = ImportedTransaction(
+                transactionDate: resolvedTransactionDate,
+                postDate: resolvedPostDate,
+                merchant: merchant,
+                billingAmount: billingAmount,
+                foreignAmount: item.foreignAmount,
+                foreignCurrency: item.foreignCurrency,
+                rawText: item.rawText
+            )
+            results.append(transaction)
+        }
+
+        return results
+    }
+
+    private func parseStatementDate(from value: String?, statementDate: Date?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        return parseDateToken(value, statementDate: statementDate)
+    }
+
+    private func renderPages(from url: URL) async -> [UIImage]? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let document = PDFDocument(url: url) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                var images: [UIImage] = []
+                for index in 0..<document.pageCount {
+                    guard let page = document.page(at: index) else { continue }
+                    if let image = renderPageImage(from: page, maxDimension: Self.maxPageDimension) {
+                        images.append(image)
+                    }
+                }
+                continuation.resume(returning: images)
+            }
+        }
+    }
+
+    private func renderPageImage(from page: PDFPage, maxDimension: CGFloat) -> UIImage? {
+        let pageRect = page.bounds(for: .mediaBox)
+        guard pageRect.width > 0, pageRect.height > 0 else { return nil }
+
+        let maxSide = max(pageRect.width, pageRect.height)
+        let scale = min(1, maxDimension / maxSide)
+        let targetSize = CGSize(width: pageRect.width * scale, height: pageRect.height * scale)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        return renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: targetSize))
+
+            let cgContext = context.cgContext
+            cgContext.saveGState()
+            // Flip PDF coordinates and apply scaling to avoid oversized renders.
+            cgContext.translateBy(x: 0, y: targetSize.height)
+            cgContext.scaleBy(x: scale, y: -scale)
+            cgContext.translateBy(x: -pageRect.origin.x, y: -pageRect.origin.y)
+            page.draw(with: .mediaBox, to: cgContext)
+            cgContext.restoreGState()
+        }
     }
 
     private func parseTransactions(from lines: [String], statementDate: Date?) -> [ImportedTransaction] {
@@ -200,7 +365,7 @@ struct StatementParser {
 
     private func extractStatementDate(from text: String) -> Date? {
         let lines = text.components(separatedBy: .newlines)
-        let datePattern = regex("(\\d{1,2}\\s*[A-Za-z]{3}\\s*\\d{2,4}|\\d{1,2}[A-Za-z]{3}\\d{2,4}|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}|\\d{4}-\\d{1,2}-\\d{1,2})")
+        let datePattern = regex("(\\d{1,2}\\s*[A-Za-z]{3}\\s*\\d{2,4}|\\d{1,2}[A-Za-z]{3}\\d{2,4}|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4}[\\/\\.:]\\d{1,2}[\\/\\.:]\\d{1,2})")
 
         for line in lines {
             let lower = line.lowercased()
@@ -255,6 +420,18 @@ struct StatementParser {
             }
         }
 
+        let normalized = trimmed
+            .replacingOccurrences(of: ".", with: "/")
+            .replacingOccurrences(of: ":", with: "/")
+            .replacingOccurrences(of: "-", with: "/")
+        if normalized != trimmed {
+            for formatter in Self.numericDateFormatters {
+                if let date = formatter.date(from: normalized) {
+                    return date
+                }
+            }
+        }
+
         let compact = trimmed
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "-", with: "")
@@ -263,8 +440,46 @@ struct StatementParser {
             return date
         }
 
-        if let date = parseSlashDateWithoutYear(trimmed, statementDate: statementDate) {
+        if let date = parseYearFirstDate(normalized) {
             return date
+        }
+
+        if let date = parseSlashDateWithoutYear(normalized, statementDate: statementDate) {
+            return date
+        }
+
+        return nil
+    }
+
+    private func parseYearFirstDate(_ token: String) -> Date? {
+        let cleaned = token.replacingOccurrences(of: " ", with: "")
+        if cleaned.count == 8, let year = Int(cleaned.prefix(4)) {
+            let monthString = cleaned.dropFirst(4).prefix(2)
+            let dayString = cleaned.suffix(2)
+            if let month = Int(monthString), let day = Int(dayString) {
+                return makeDate(day: day, month: month, year: year)
+            }
+        }
+
+        if cleaned.count == 9, let year = Int(cleaned.prefix(4)) {
+            let rest = cleaned.dropFirst(5)
+            if rest.count == 4 {
+                let monthString = rest.prefix(2)
+                let dayString = rest.suffix(2)
+                if let month = Int(monthString), let day = Int(dayString) {
+                    return makeDate(day: day, month: month, year: year)
+                }
+            }
+        }
+
+        let parts = cleaned.split(separator: "/")
+        if parts.count == 2, parts[0].count == 4, parts[1].count == 4,
+           let year = Int(parts[0]) {
+            let monthString = parts[1].prefix(2)
+            let dayString = parts[1].suffix(2)
+            if let month = Int(monthString), let day = Int(dayString) {
+                return makeDate(day: day, month: month, year: year)
+            }
         }
 
         return nil
@@ -552,7 +767,15 @@ struct StatementParser {
     }
 
     private static let numericDateFormatters: [DateFormatter] = {
-        let formats = ["MM/dd/yy", "MM/dd/yyyy", "dd/MM/yy", "dd/MM/yyyy", "yyyy-MM-dd"]
+        let formats = [
+            "MM/dd/yy",
+            "MM/dd/yyyy",
+            "dd/MM/yy",
+            "dd/MM/yyyy",
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "yyyy/M/d"
+        ]
         return formats.map { format in
             let formatter = DateFormatter()
             formatter.dateFormat = format
@@ -563,4 +786,5 @@ struct StatementParser {
     }()
 
     private let amountPattern = "-?[A-Za-z$]{0,4}\\s*\\(?[\\d,]+\\.\\d{2}\\)?(?:[cC][rR])?"
+    private static let maxPageDimension: CGFloat = 2500
 }

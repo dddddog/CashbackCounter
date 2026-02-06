@@ -10,6 +10,21 @@ import UIKit
 import FoundationModels // 引入 AI 框架
 import ImageIO          // 用于处理图片方向
 
+struct RecognizedElement: Hashable {
+    let text: String
+    let xPosition: CGFloat
+    let boundingBox: CGRect
+}
+
+struct RecognizedRow: Hashable {
+    let yPosition: CGFloat
+    let elements: [RecognizedElement]
+
+    var text: String {
+        elements.map(\.text).joined(separator: " ")
+    }
+}
+
 struct OCRService {
     
     @MainActor static let aiParser = ReceiptParser()
@@ -122,6 +137,68 @@ struct OCRService {
             try? requestHandler.perform([request])
         }
     }
+
+    static func recognizeObservations(from image: UIImage, languages: [String]) async -> [VNRecognizedTextObservation] {
+        guard let cgImage = image.cgImage else { return [] }
+        let orientation = cgImageOrientation(from: image.imageOrientation)
+
+        return await withCheckedContinuation { continuation in
+            let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
+            let request = VNRecognizeTextRequest { request, error in
+                guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                continuation.resume(returning: observations)
+            }
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = languages
+            try? requestHandler.perform([request])
+        }
+    }
+
+    static func reconstructRows(from observations: [VNRecognizedTextObservation]) -> [RecognizedRow] {
+        let elements: [RecognizedElement] = observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            let box = observation.boundingBox
+            return RecognizedElement(text: text, xPosition: box.midX, boundingBox: box)
+        }
+
+        guard !elements.isEmpty else { return [] }
+
+        let heights = elements.map { $0.boundingBox.height }.sorted()
+        let medianHeight = heights[heights.count / 2]
+        let rowThreshold = medianHeight * 0.6
+
+        let sortedElements = elements.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+        var rows: [RecognizedRow] = []
+        var currentRow: [RecognizedElement] = []
+        var lastY: CGFloat?
+        var lastHeight: CGFloat?
+
+        for element in sortedElements {
+            let elementHeight = element.boundingBox.height
+            let localThreshold = min(rowThreshold, min(elementHeight, lastHeight ?? elementHeight) * 0.8)
+            if let lastY, abs(element.boundingBox.midY - lastY) < localThreshold {
+                currentRow.append(element)
+            } else {
+                if !currentRow.isEmpty {
+                    rows.append(buildRow(from: currentRow))
+                }
+                currentRow = [element]
+            }
+            lastY = element.boundingBox.midY
+            lastHeight = elementHeight
+        }
+
+        if !currentRow.isEmpty {
+            rows.append(buildRow(from: currentRow))
+        }
+
+        return rows
+    }
     
     static func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
         switch uiOrientation {
@@ -135,5 +212,11 @@ struct OCRService {
         case .rightMirrored: return .rightMirrored
         @unknown default: return .up
         }
+    }
+
+    private static func buildRow(from elements: [RecognizedElement]) -> RecognizedRow {
+        let sorted = elements.sorted { $0.xPosition < $1.xPosition }
+        let avgY = sorted.reduce(CGFloat.zero) { $0 + $1.boundingBox.midY } / CGFloat(sorted.count)
+        return RecognizedRow(yPosition: avgY, elements: sorted)
     }
 }

@@ -49,18 +49,19 @@ struct StatementAnalysisEntryView: View {
                     return
                 }
                 isParsing = true
-                defer {
-                    url.stopAccessingSecurityScopedResource()
-                    isParsing = false
+                Task {
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    let metadata = await StatementParser().parse(from: url)
+                    await MainActor.run {
+                        if let metadata {
+                            statement = metadata
+                            statementVersion += 1
+                        } else {
+                            errorMessage = "解析失败"
+                        }
+                        isParsing = false
+                    }
                 }
-
-                let metadata = StatementParser().parse(from: url)
-                guard let metadata else {
-                    errorMessage = "解析失败"
-                    return
-                }
-                statement = metadata
-                statementVersion += 1
             case .failure(let error):
                 errorMessage = "选择文件失败：\(error.localizedDescription)"
             }
@@ -105,7 +106,7 @@ struct StatementAnalysisView: View {
     ])
     private var cards: [CreditCard]
     @State private var selectedMissing: ImportedTransaction?
-    @State private var selectedCardIndex: Int = 0
+    @State private var selectedCardIndex: Int? = nil
     @State private var analyzedTransactions: [ImportedTransaction] = []
     @State private var detectedCardLast4: String?
     @State private var detectedCardName: String?
@@ -123,7 +124,7 @@ struct StatementAnalysisView: View {
     }
 
     private var selectedCard: CreditCard? {
-        guard cards.indices.contains(selectedCardIndex) else { return nil }
+        guard let selectedCardIndex, cards.indices.contains(selectedCardIndex) else { return nil }
         return cards[selectedCardIndex]
     }
 
@@ -191,6 +192,9 @@ struct StatementAnalysisView: View {
             await autoAnalyzeIfNeeded()
         }
         .onChange(of: cards.count) { _, _ in
+            if let selectedCardIndex, !cards.indices.contains(selectedCardIndex) {
+                self.selectedCardIndex = nil
+            }
             applyDetectedCardSelectionIfNeeded()
         }
         .onChange(of: detectedCardLast4) { _, _ in
@@ -415,7 +419,7 @@ private struct StatementSummaryCard: View {
     let metadata: StatementMetadata
     let report: ReconciliationReport
     let cards: [CreditCard]
-    @Binding var selectedCardIndex: Int
+    @Binding var selectedCardIndex: Int?
     let detectedCardText: String?
     let isDetectingCard: Bool
     let isAnalyzingTransactions: Bool
@@ -458,6 +462,8 @@ private struct StatementSummaryCard: View {
                         .font(.subheadline)
                     Spacer()
                     Picker("结单卡", selection: $selectedCardIndex) {
+                        Text("请选择")
+                            .tag(Int?.none)
                         ForEach(cards.indices, id: \.self) { index in
                             let card = cards[index]
                             Text("\(card.bankName) \(card.type)")
@@ -465,7 +471,7 @@ private struct StatementSummaryCard: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                                 .truncationMode(.middle)
-                                .tag(index)
+                                .tag(index as Int?)
                         }
                     }
                     .pickerStyle(.menu)
@@ -665,4 +671,3 @@ private extension ImportedTransaction {
         )
     }
 }
-

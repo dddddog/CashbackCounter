@@ -94,6 +94,19 @@ final class ReceiptParser {
         "Do not return the billing/settlement amount as foreignAmount."
         "If unsure, return nil for the field."
     }
+
+    private let statementRowInstructions = Instructions{
+        "You are an expert credit card statement transaction extractor."
+        "You will be given transaction blocks. Each block groups OCR rows for a single transaction candidate."
+        "Never merge across blocks. Extract at most one transaction per block."
+        "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
+        "For each transaction return: transactionDate, postDate, merchant, billingAmount, foreignAmount, foreignCurrency, rawText."
+        "Dates must be in YYYY-MM-DD. If only one date is present, use it for both transactionDate and postDate."
+        "billingAmount is the settled amount in statement currency. Use negative for refunds/credits."
+        "If foreign currency details exist, extract foreignAmount and foreignCurrency; otherwise nil."
+        "rawText should be the block text as given."
+        "Do not guess. If unsure, return nil for the field."
+    }
     
     init() {}
     
@@ -165,4 +178,22 @@ final class ReceiptParser {
         return metadata
     }
     
+    func parseStatementTransactions(from blocks: [String]) async throws -> [StatementRowTransaction] {
+        let session = LanguageModelSession(instructions: statementRowInstructions)
+        let blockText = blocks.enumerated().map { index, block in
+            "Block \(index + 1):\n\(block)"
+        }.joined(separator: "\n\n")
+
+        let response = try await session.respond(
+            generating: StatementRowTransactionList.self
+        ) {
+            "Analyze these statement blocks:"
+            blockText
+        }
+
+        let transactions = response.content.transactions
+        print("Statement row transactions: \(transactions.count)")
+        return transactions
+    }
+
 }
