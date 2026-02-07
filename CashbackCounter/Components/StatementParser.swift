@@ -123,13 +123,26 @@ struct StatementParser {
             block.map(\.text).joined(separator: "\n")
         }
 
-        do {
-            let parsed = try await ReceiptParser().parseStatementTransactions(from: blockTexts)
-            return buildImportedTransactions(from: parsed, statementDate: statementDate)
-        } catch {
-            print("Statement row parse failed: \(error)")
+        var parsed: [StatementRowTransaction] = []
+        let parser = ReceiptParser()
+
+        for block in blockTexts {
+            do {
+                var item = try await parser.parseStatementTransactionBlock(text: block)
+                if item.rawText == nil || item.rawText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                    item.rawText = block
+                }
+                parsed.append(item)
+            } catch {
+                print("Statement block parse failed: \(error)")
+            }
+        }
+
+        if parsed.isEmpty {
             return []
         }
+
+        return buildImportedTransactions(from: parsed, statementDate: statementDate)
     }
 
     private func groupRowsIntoTransactionBlocks(
@@ -414,22 +427,12 @@ struct StatementParser {
             .trimmingCharacters(in: CharacterSet(charactersIn: ",."))
         guard !trimmed.isEmpty else { return nil }
 
-        for formatter in Self.numericDateFormatters {
-            if let date = formatter.date(from: trimmed) {
-                return date
-            }
+        if let date = parseMonthNameDate(trimmed, statementDate: statementDate) {
+            return date
         }
 
-        let normalized = trimmed
-            .replacingOccurrences(of: ".", with: "/")
-            .replacingOccurrences(of: ":", with: "/")
-            .replacingOccurrences(of: "-", with: "/")
-        if normalized != trimmed {
-            for formatter in Self.numericDateFormatters {
-                if let date = formatter.date(from: normalized) {
-                    return date
-                }
-            }
+        if let date = parseCompactMonthDayYear(trimmed) {
+            return date
         }
 
         let compact = trimmed
@@ -440,12 +443,119 @@ struct StatementParser {
             return date
         }
 
-        if let date = parseYearFirstDate(normalized) {
-            return date
+        let separatorCount = trimmed.filter { "/-.:".contains($0) }.count
+        let hasSlashOrDash = trimmed.contains("/") || trimmed.contains("-")
+        let shouldTryNumeric = hasSlashOrDash || separatorCount >= 2
+        if shouldTryNumeric {
+            for formatter in Self.numericDateFormatters {
+                if let date = formatter.date(from: trimmed) {
+                    return date
+                }
+            }
         }
 
-        if let date = parseSlashDateWithoutYear(normalized, statementDate: statementDate) {
-            return date
+        if shouldTryNumeric {
+            let normalized = trimmed
+                .replacingOccurrences(of: ".", with: "/")
+                .replacingOccurrences(of: ":", with: "/")
+                .replacingOccurrences(of: "-", with: "/")
+            for formatter in Self.numericDateFormatters {
+                if let date = formatter.date(from: normalized) {
+                    return date
+                }
+            }
+
+            if let date = parseYearFirstDate(normalized) {
+                return date
+            }
+
+            if let date = parseSlashDateWithoutYear(normalized, statementDate: statementDate) {
+                return date
+            }
+        }
+
+        return nil
+    }
+
+    private func parseCompactMonthDayYear(_ token: String) -> Date? {
+        let cleaned = token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ",."))
+        let parts = cleaned.split { $0 == "/" || $0 == "-" }
+        guard parts.count == 2 else { return nil }
+
+        let monthDayToken = String(parts[0].filter { $0.isNumber })
+        let yearToken = String(parts[1].filter { $0.isNumber })
+        guard monthDayToken.count == 4, (yearToken.count == 2 || yearToken.count == 4) else { return nil }
+        let monthString = monthDayToken.prefix(2)
+        let dayString = monthDayToken.suffix(2)
+        guard let month = Int(monthString), let day = Int(dayString) else { return nil }
+        guard (1...12).contains(month), (1...31).contains(day) else { return nil }
+
+        let year = normalizeYear(from: yearToken)
+        return makeDate(day: day, month: month, year: year)
+    }
+
+    private func parseMonthNameDate(_ token: String, statementDate: Date?) -> Date? {
+        let cleaned = token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: " ")
+        let normalized = cleaned
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "/", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+        let upper = normalized.uppercased()
+        let parts = upper.split(whereSeparator: { $0.isWhitespace })
+
+        if parts.count >= 2 {
+            let monthToken = String(parts[0])
+            let dayToken = String(parts[1].filter { $0.isNumber })
+            if let month = Self.monthNameMap[monthToken],
+               let day = Int(dayToken) {
+                let year: Int
+                if parts.count >= 3 {
+                    let yearToken = String(parts[2].filter { $0.isNumber })
+                    if Int(yearToken) != nil {
+                        year = normalizeYear(from: yearToken)
+                    } else {
+                        year = inferredYear(for: month, statementDate: statementDate)
+                    }
+                } else {
+                    year = inferredYear(for: month, statementDate: statementDate)
+                }
+                return makeDate(day: day, month: month, year: year)
+            }
+        }
+
+        let monthPattern = regex("^(JANUARY|JAN|FEBRUARY|FEB|MARCH|MAR|APRIL|APR|MAY|JUNE|JUN|JULY|JUL|AUGUST|AUG|SEPTEMBER|SEP|OCTOBER|OCT|NOVEMBER|NOV|DECEMBER|DEC)(\\d{1,2})(\\d{2,4})?$")
+        let dayMonthPattern = regex("^(\\d{1,2})(JANUARY|JAN|FEBRUARY|FEB|MARCH|MAR|APRIL|APR|MAY|JUNE|JUN|JULY|JUL|AUGUST|AUG|SEPTEMBER|SEP|OCTOBER|OCT|NOVEMBER|NOV|DECEMBER|DEC)(\\d{2,4})?$")
+
+        let patterns: [(NSRegularExpression, Bool)] = [
+            (monthPattern, true),
+            (dayMonthPattern, false)
+        ]
+        for (pattern, isMonthFirst) in patterns {
+            let range = NSRange(upper.startIndex..<upper.endIndex, in: upper)
+            guard let match = pattern.firstMatch(in: upper, range: range), match.numberOfRanges >= 3 else { continue }
+            if isMonthFirst {
+                guard let monthToken = rangeString(match.range(at: 1), in: upper),
+                      let dayString = rangeString(match.range(at: 2), in: upper) else { continue }
+                guard let month = Self.monthNameMap[monthToken], let day = Int(dayString) else { continue }
+                let year = (match.numberOfRanges >= 4 ? rangeString(match.range(at: 3), in: upper) : nil)
+                    .flatMap { Int($0) }
+                    .map { normalizeYear(from: String($0)) }
+                    ?? inferredYear(for: month, statementDate: statementDate)
+                return makeDate(day: day, month: month, year: year)
+            } else {
+                guard let dayString = rangeString(match.range(at: 1), in: upper),
+                      let monthToken = rangeString(match.range(at: 2), in: upper) else { continue }
+                guard let month = Self.monthNameMap[monthToken], let day = Int(dayString) else { continue }
+                let year = (match.numberOfRanges >= 4 ? rangeString(match.range(at: 3), in: upper) : nil)
+                    .flatMap { Int($0) }
+                    .map { normalizeYear(from: String($0)) }
+                    ?? inferredYear(for: month, statementDate: statementDate)
+                return makeDate(day: day, month: month, year: year)
+            }
         }
 
         return nil
@@ -781,9 +891,25 @@ struct StatementParser {
             formatter.dateFormat = format
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = TimeZone.current
+            formatter.isLenient = false
             return formatter
         }
     }()
+
+    private static let monthNameMap: [String: Int] = [
+        "JAN": 1, "JANUARY": 1,
+        "FEB": 2, "FEBRUARY": 2,
+        "MAR": 3, "MARCH": 3,
+        "APR": 4, "APRIL": 4,
+        "MAY": 5,
+        "JUN": 6, "JUNE": 6,
+        "JUL": 7, "JULY": 7,
+        "AUG": 8, "AUGUST": 8,
+        "SEP": 9, "SEPTEMBER": 9,
+        "OCT": 10, "OCTOBER": 10,
+        "NOV": 11, "NOVEMBER": 11,
+        "DEC": 12, "DECEMBER": 12
+    ]
 
     private let amountPattern = "-?[A-Za-z$]{0,4}\\s*\\(?[\\d,]+\\.\\d{2}\\)?(?:[cC][rR])?"
     private static let maxPageDimension: CGFloat = 2500

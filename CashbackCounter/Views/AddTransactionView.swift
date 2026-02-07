@@ -455,6 +455,9 @@ struct AddTransactionView: View {
             return
         }
         guard transactionToEdit == nil else { return }
+        if shouldSkipRateUpdate{
+            return
+        }
 
         Task {
             do {

@@ -197,7 +197,7 @@ struct OCRService {
             rows.append(buildRow(from: currentRow))
         }
 
-        return rows
+        return splitRowsIfNeeded(rows, baselineHeight: medianHeight)
     }
     
     static func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
@@ -218,5 +218,48 @@ struct OCRService {
         let sorted = elements.sorted { $0.xPosition < $1.xPosition }
         let avgY = sorted.reduce(CGFloat.zero) { $0 + $1.boundingBox.midY } / CGFloat(sorted.count)
         return RecognizedRow(yPosition: avgY, elements: sorted)
+    }
+
+    private static func splitRowsIfNeeded(_ rows: [RecognizedRow], baselineHeight: CGFloat) -> [RecognizedRow] {
+        let splitThreshold = baselineHeight * 1.1
+        let clusterThreshold = baselineHeight * 0.4
+        var output: [RecognizedRow] = []
+
+        for row in rows {
+            let elements = row.elements
+            guard elements.count > 1 else {
+                output.append(row)
+                continue
+            }
+
+            let minY = elements.map { $0.boundingBox.minY }.min() ?? 0
+            let maxY = elements.map { $0.boundingBox.maxY }.max() ?? 0
+            if (maxY - minY) <= splitThreshold {
+                output.append(row)
+                continue
+            }
+
+            let sortedByY = elements.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+            var current: [RecognizedElement] = []
+            var lastY: CGFloat?
+
+            for element in sortedByY {
+                if let lastY, abs(element.boundingBox.midY - lastY) < clusterThreshold {
+                    current.append(element)
+                } else {
+                    if !current.isEmpty {
+                        output.append(buildRow(from: current))
+                    }
+                    current = [element]
+                }
+                lastY = element.boundingBox.midY
+            }
+
+            if !current.isEmpty {
+                output.append(buildRow(from: current))
+            }
+        }
+
+        return output
     }
 }

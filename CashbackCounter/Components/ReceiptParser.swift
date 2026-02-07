@@ -97,10 +97,10 @@ final class ReceiptParser {
 
     private let statementRowInstructions = Instructions{
         "You are an expert credit card statement transaction extractor."
-        "You will be given transaction blocks. Each block groups OCR rows for a single transaction candidate."
-        "Never merge across blocks. Extract at most one transaction per block."
+        "You will be given a single transaction block from OCR."
+        "Extract at most one transaction from this block."
         "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
-        "For each transaction return: transactionDate, postDate, merchant, billingAmount, foreignAmount, foreignCurrency, rawText."
+        "For the transaction return: transactionDate, postDate, merchant, billingAmount, foreignAmount, foreignCurrency, rawText."
         "Dates must be in YYYY-MM-DD. If only one date is present, use it for both transactionDate and postDate."
         "billingAmount is the settled amount in statement currency. Use negative for refunds/credits."
         "If foreign currency details exist, extract foreignAmount and foreignCurrency; otherwise nil."
@@ -109,6 +109,12 @@ final class ReceiptParser {
     }
     
     init() {}
+
+    private func normalizedCardLast4(_ value: String?) -> String? {
+        let digits = value?.filter { $0.isNumber } ?? ""
+        guard digits.count >= 4 else { return nil }
+        return String(digits.suffix(4))
+    }
     
     // 3. 解析方法
     func parse(text: String) async throws -> ReceiptMetadata {
@@ -157,7 +163,8 @@ final class ReceiptParser {
             text
         }
 
-        let metadata = response.content
+        var metadata = response.content
+        metadata.cardLast4 = normalizedCardLast4(metadata.cardLast4)
         print("Statement OCR fields: cardLast4=\(metadata.cardLast4 ?? "nil"), cardName=\(metadata.cardName ?? "nil")")
         return metadata
     }
@@ -178,6 +185,18 @@ final class ReceiptParser {
         return metadata
     }
     
+    func parseStatementTransactionBlock(text: String) async throws -> StatementRowTransaction {
+        let session = LanguageModelSession(instructions: statementRowInstructions)
+        let response = try await session.respond(
+            generating: StatementRowTransaction.self
+        ) {
+            "Analyze this statement block:"
+            text
+        }
+
+        return response.content
+    }
+
     func parseStatementTransactions(from blocks: [String]) async throws -> [StatementRowTransaction] {
         let session = LanguageModelSession(instructions: statementRowInstructions)
         let blockText = blocks.enumerated().map { index, block in

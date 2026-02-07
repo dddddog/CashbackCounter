@@ -330,6 +330,7 @@ struct StatementAnalysisView: View {
         var lines: [String] = [
             "Merchant: \(transaction.merchant)",
             "BillingAmount: \(String(format: "%.2f", transaction.billingAmount))",
+            "BillingCurrency: \(String(selectedCard?.issueRegion.currencyCode ?? "unknow")),"
         ]
 
         if let currency = transaction.region?.currencyCode, let amount = transaction.foreignAmount {
