@@ -75,13 +75,12 @@ struct StatementRowTransaction {
     @Guide(description: "Transaction date in YYYY-MM-DD format. Return nil if not present.")
     var transactionDate: String?
 
-    @Guide(description: "Post date in YYYY-MM-DD format. Return nil if not present.")
     var postDate: String?
 
     @Guide(description: "Merchant name or description.")
     var merchant: String?
 
-    @Guide(description: "Billing amount in statement currency. Use negative for refunds/credits.")
+    @Guide(description: "Billing amount in statement currency.")
     var billingAmount: Double?
 
     @Guide(description: "Original amount in foreign currency if available.")
@@ -89,8 +88,7 @@ struct StatementRowTransaction {
 
     @Guide(description: "Foreign currency code if available (e.g. USD, JPY).")
     var foreignCurrency: String?
-
-    @Guide(description: "Raw OCR row text used for this transaction.")
+    
     var rawText: String?
 }
 

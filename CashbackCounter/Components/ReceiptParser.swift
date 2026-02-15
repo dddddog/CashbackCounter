@@ -75,6 +75,9 @@ final class ReceiptParser {
         "Extract the card product name and the last 4 digits of the card."
         "If a field is missing, return nil for it."
         "Do not guess. Use only information present in the statement text."
+        "Extract the card product name and the last 4 digits of the card."
+        "If a field is missing, return nil for it."
+        "Do not guess. Use only information present in the statement text."
     }
 
     private let statementTransactionInstructions = Instructions{
@@ -90,7 +93,10 @@ final class ReceiptParser {
         "- 'other': Anything that doesn't fit above."
         "Use payment hints such as Apple Pay, online, QR, tap, NFC, or card present/online words."
         "Extract the original transaction amount in foreign currency if the statement shows exchange details."
-        "If there is a line like '65.00 X 0.03184615' or a foreign currency section, return 65.00 as foreignAmount (not the rate)."
+        "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present."
+        "Do not return the billing/settlement amount as foreignAmount."
+        "Extract the original transaction amount in foreign currency if the statement shows exchange details."
+        "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present."
         "Do not return the billing/settlement amount as foreignAmount."
         "If unsure, return nil for the field."
     }
@@ -99,12 +105,17 @@ final class ReceiptParser {
         "You are an expert credit card statement transaction extractor."
         "You will be given a single transaction block from OCR."
         "Extract at most one transaction from this block."
+        "Only return merchant with alphabet characters or necessary numbers."
+        "Only return merchant with alphabet characters or necessary numbers."
         "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
-        "For the transaction return: transactionDate, postDate, merchant, billingAmount, foreignAmount, foreignCurrency, rawText."
-        "Dates must be in YYYY-MM-DD. If only one date is present, use it for both transactionDate and postDate."
-        "billingAmount is the settled amount in statement currency. Use negative for refunds/credits."
-        "If foreign currency details exist, extract foreignAmount and foreignCurrency; otherwise nil."
-        "rawText should be the block text as given."
+        "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
+        "For the transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
+        "For the transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
+        "Dates must be in YYYY-MM-DD. If only one date is present, use it for both transactionDate."
+        "billingAmount is the settled amount in statement currency."
+        "Using the foreignCurrency to confirm foreign amount and billing amount"
+        "Using the foreignCurrency to confirm foreign amount and billing amount"
+        "Do not guess. If unsure, return nil for the field."
         "Do not guess. If unsure, return nil for the field."
     }
     
@@ -195,24 +206,6 @@ final class ReceiptParser {
         }
 
         return response.content
-    }
-
-    func parseStatementTransactions(from blocks: [String]) async throws -> [StatementRowTransaction] {
-        let session = LanguageModelSession(instructions: statementRowInstructions)
-        let blockText = blocks.enumerated().map { index, block in
-            "Block \(index + 1):\n\(block)"
-        }.joined(separator: "\n\n")
-
-        let response = try await session.respond(
-            generating: StatementRowTransactionList.self
-        ) {
-            "Analyze these statement blocks:"
-            blockText
-        }
-
-        let transactions = response.content.transactions
-        print("Statement row transactions: \(transactions.count)")
-        return transactions
     }
 
 }

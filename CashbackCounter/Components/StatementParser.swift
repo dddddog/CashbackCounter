@@ -129,9 +129,7 @@ struct StatementParser {
         for block in blockTexts {
             do {
                 var item = try await parser.parseStatementTransactionBlock(text: block)
-                if item.rawText == nil || item.rawText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
-                    item.rawText = block
-                }
+                item.rawText = block
                 parsed.append(item)
             } catch {
                 print("Statement block parse failed: \(error)")
@@ -201,12 +199,14 @@ struct StatementParser {
             guard let resolvedTransactionDate = transactionDate ?? postDate else { continue }
             let resolvedPostDate = postDate ?? resolvedTransactionDate
 
+            let normalizedBilling = abs(billingAmount)
+            let normalizedForeign = item.foreignAmount.map { abs($0) }
             let transaction = ImportedTransaction(
                 transactionDate: resolvedTransactionDate,
                 postDate: resolvedPostDate,
                 merchant: merchant,
-                billingAmount: billingAmount,
-                foreignAmount: item.foreignAmount,
+                billingAmount: normalizedBilling,
+                foreignAmount: normalizedForeign,
                 foreignCurrency: item.foreignCurrency,
                 rawText: item.rawText
             )
@@ -358,12 +358,14 @@ struct StatementParser {
             }
         }
 
+        let normalizedBilling = abs(billingAmount)
+        let normalizedForeign = foreignAmount.map { abs($0) }
         return ImportedTransaction(
             transactionDate: transactionDate,
             postDate: postDate,
             merchant: merchant,
-            billingAmount: billingAmount,
-            foreignAmount: foreignAmount,
+            billingAmount: normalizedBilling,
+            foreignAmount: normalizedForeign,
             foreignCurrency: foreignCurrency
         )
     }

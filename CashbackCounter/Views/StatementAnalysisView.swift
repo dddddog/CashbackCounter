@@ -30,7 +30,10 @@ struct StatementAnalysisEntryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showImporter = true } label: {
+                    Button {
+                        StatementDebugLogger.log("Tap upload statement")
+                        showImporter = true
+                    } label: {
                         Label("上传结单", systemImage: "square.and.arrow.down")
                     }
                 }
@@ -41,29 +44,43 @@ struct StatementAnalysisEntryView: View {
             allowedContentTypes: [.pdf],
             allowsMultipleSelection: false
         ) { result in
+            StatementDebugLogger.log("fileImporter result received")
             switch result {
             case .success(let urls):
+                StatementDebugLogger.log("fileImporter success urls=\(urls.count)")
                 guard let url = urls.first else { return }
+                StatementDebugLogger.log("fileImporter selected url=\(url.lastPathComponent)")
                 guard url.startAccessingSecurityScopedResource() else {
+                    StatementDebugLogger.log("startAccessingSecurityScopedResource failed")
                     errorMessage = "无法读取文件权限"
                     return
                 }
+                StatementDebugLogger.log("startAccessingSecurityScopedResource ok")
                 isParsing = true
+                StatementDebugLogger.log("set isParsing=true")
                 Task {
-                    defer { url.stopAccessingSecurityScopedResource() }
+                    StatementDebugLogger.log("parse task started")
+                    defer {
+                        url.stopAccessingSecurityScopedResource()
+                        StatementDebugLogger.log("stopAccessingSecurityScopedResource")
+                    }
                     let metadata = await StatementParser().parse(from: url)
                     await MainActor.run {
                         if let metadata {
                             statement = metadata
                             statementVersion += 1
+                            StatementDebugLogger.log("parse success transactions=\(metadata.transactions.count)")
                         } else {
                             errorMessage = "解析失败"
+                            StatementDebugLogger.log("parse failed: metadata nil")
                         }
                         isParsing = false
+                        StatementDebugLogger.log("set isParsing=false")
                     }
                 }
             case .failure(let error):
                 errorMessage = "选择文件失败：\(error.localizedDescription)"
+                StatementDebugLogger.log("fileImporter failure: \(error.localizedDescription)")
             }
         }
         .alert("导入失败", isPresented: errorBinding) {
@@ -188,19 +205,24 @@ struct StatementAnalysisView: View {
         .navigationTitle("Statement Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            StatementDebugLogger.log("StatementAnalysisView task start")
             await detectStatementCardIfNeeded()
             await autoAnalyzeIfNeeded()
+            StatementDebugLogger.log("StatementAnalysisView task end")
         }
         .onChange(of: cards.count) { _, _ in
+            StatementDebugLogger.log("cards count changed: \(cards.count)")
             if let selectedCardIndex, !cards.indices.contains(selectedCardIndex) {
                 self.selectedCardIndex = nil
             }
             applyDetectedCardSelectionIfNeeded()
         }
         .onChange(of: detectedCardLast4) { _, _ in
+            StatementDebugLogger.log("detectedCardLast4 changed: \(detectedCardLast4 ?? "nil")")
             applyDetectedCardSelectionIfNeeded()
         }
         .onChange(of: detectedCardName) { _, _ in
+            StatementDebugLogger.log("detectedCardName changed: \(detectedCardName ?? "nil")")
             applyDetectedCardSelectionIfNeeded()
         }
         .sheet(item: $selectedMissing) { item in
@@ -232,20 +254,36 @@ struct StatementAnalysisView: View {
 
     @MainActor
     private func detectStatementCardIfNeeded() async {
-        guard !isDetectingCard else { return }
-        guard detectedCardLast4 == nil && detectedCardName == nil else { return }
-        guard let statementText = statement.statementText, !statementText.isEmpty else { return }
+        StatementDebugLogger.log("detectStatementCardIfNeeded start")
+        guard !isDetectingCard else {
+            StatementDebugLogger.log("detectStatementCardIfNeeded skip: already detecting")
+            return
+        }
+        guard detectedCardLast4 == nil && detectedCardName == nil else {
+            StatementDebugLogger.log("detectStatementCardIfNeeded skip: card already detected")
+            return
+        }
+        guard let statementText = statement.statementText, !statementText.isEmpty else {
+            StatementDebugLogger.log("detectStatementCardIfNeeded skip: statementText empty")
+            return
+        }
         let promptText = statementCardPromptText(from: statementText)
+        StatementDebugLogger.log("detectStatementCardIfNeeded prompt length=\(promptText.count)")
 
         isDetectingCard = true
-        defer { isDetectingCard = false }
+        StatementDebugLogger.log("detectStatementCardIfNeeded isDetectingCard=true")
+        defer {
+            isDetectingCard = false
+            StatementDebugLogger.log("detectStatementCardIfNeeded isDetectingCard=false")
+        }
 
         do {
             let metadata = try await ReceiptParser().parseStatementCard(text: promptText)
             detectedCardLast4 = metadata.cardLast4?.trimmingCharacters(in: .whitespacesAndNewlines)
             detectedCardName = metadata.cardName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            StatementDebugLogger.log("detectStatementCardIfNeeded success last4=\(detectedCardLast4 ?? "nil") name=\(detectedCardName ?? "nil")")
         } catch {
-            print("Statement card parse failed: \(error)")
+            StatementDebugLogger.log("detectStatementCardIfNeeded failed: \(error)")
         }
     }
 
@@ -400,7 +438,7 @@ struct StatementAnalysisView: View {
         }
 
         var prompt = selectedLines.joined(separator: "\n")
-        let maxChars = 2000
+        let maxChars = 1800
         if prompt.count > maxChars {
             prompt = String(prompt.prefix(maxChars))
         }
