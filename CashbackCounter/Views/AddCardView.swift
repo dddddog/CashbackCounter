@@ -13,6 +13,8 @@ struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var imageManager = ImageDownloadManager()
     @State private var cardImageData: Data? = nil
+    @Query(sort: [SortDescriptor(\Point.bankName, order: .forward)])
+    private var points: [Point]
     
     // 1. 接收要编辑的卡片 (如果是 nil 就是添加模式)
     var cardToEdit: CreditCard?
@@ -56,6 +58,9 @@ struct AddCardView: View {
     // 支付方式 (Payment Method) 的状态变量
     @State private var paymentMethodRates: [PaymentMethod: Double]
     @State private var paymentCaps: [PaymentMethod: Double]
+    @State private var rewardType: RewardType
+    @State private var selectedPointID: UUID?
+    @State private var showPointLibrary = false
     
     // --- 2. 核心：自定义初始化 ---
     init(template: CardTemplate? = nil, cardToEdit: CreditCard? = nil, onSaved: (() -> Void)? = nil) {
@@ -110,6 +115,8 @@ struct AddCardView: View {
             let ratesForUI = card.paymentMethodRates.mapValues { $0 * 100}
             _paymentMethodRates = State(initialValue: ratesForUI)
             _paymentCaps = State(initialValue: card.paymentCaps)
+            _rewardType = State(initialValue: card.rewardType)
+            _selectedPointID = State(initialValue: card.pointProgram?.id)
             
         }
         // 逻辑 B: 模板模式 -> 填充模板数据
@@ -175,6 +182,8 @@ struct AddCardView: View {
             
             _paymentMethodRates = State(initialValue: template.paymentMethodRates)
             _paymentCaps = State(initialValue: template.paymentCaps)
+            _rewardType = State(initialValue: .cashback)
+            _selectedPointID = State(initialValue: nil)
             
             
         }
@@ -192,6 +201,8 @@ struct AddCardView: View {
             
             _paymentMethodRates = State(initialValue: [:])
             _paymentCaps = State(initialValue: [:])
+            _rewardType = State(initialValue: .cashback)
+            _selectedPointID = State(initialValue: nil)
         }
     }
     
@@ -246,6 +257,32 @@ struct AddCardView: View {
                     Text("日")
                         .foregroundColor(.secondary)
                 }
+
+                Section(header: Text("奖励类型")) {
+                    Picker("奖励类型", selection: $rewardType) {
+                        ForEach(RewardType.allCases, id: \.self) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                if rewardType == .points {
+                    Section(header: Text("积分库")) {
+                        if points.isEmpty {
+                            Text("暂无积分库，请先创建")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Picker("选择积分计划", selection: $selectedPointID) {
+                            Text("未选择").tag(UUID?.none)
+                            ForEach(points) { point in
+                                Text(point.displayName).tag(Optional(point.id))
+                            }
+                        }
+                        Button("管理积分库") { showPointLibrary = true }
+                    }
+                }
                 
                 // 3. 颜色设置
                 Section(header: Text("卡面风格")) {
@@ -253,8 +290,8 @@ struct AddCardView: View {
                     ColorPicker("渐变色 2", selection: $color2)
                 }
                 
-                Section(header: Text("返现上限周期")){
-                    Picker("返现上限周期", selection: $capPeriod) {
+                Section(header: Text(capPeriodTitle)){
+                    Picker(capPeriodTitle, selection: $capPeriod) {
                         Text("按月").tag(CapPeriod.monthly)
                         Text("按年").tag(CapPeriod.yearly)
                     }
@@ -262,7 +299,7 @@ struct AddCardView: View {
                 .pickerStyle(.segmented)
                 
                 // 4. 规则设置 - 基础
-                Section(header: Text("基础返现 (所有消费)")) {
+                Section(header: Text(baseSectionTitle)) {
                     Picker("发行地区", selection: $region) {
                         ForEach(Region.allCases, id: \.self) { r in
                             Text("\(r.icon) \(r.rawValue)").tag(r)
@@ -270,7 +307,7 @@ struct AddCardView: View {
                     }
                     
                     HStack {
-                        Text("本币返现率 (%)")
+                        Text(localRateTitle)
                         Spacer()
                         TextField("1.0", text: $defaultRateStr)
                             .keyboardType(.decimalPad)
@@ -278,7 +315,7 @@ struct AddCardView: View {
                             .frame(width: 50)
                     }
                     HStack {
-                        Text("本币\(capPeriod == .monthly ? "月" : "年")上限")
+                        Text(localCapTitle)
                             .font(.caption).foregroundColor(.secondary)
                         Spacer()
                         TextField("无上限", text: $localBaseCapStr)
@@ -288,7 +325,7 @@ struct AddCardView: View {
                     }
                     
                     HStack {
-                        Text("外币返现率 (%)")
+                        Text(foreignRateTitle)
                         Spacer()
                         TextField("同本币", text: $foreignRateStr)
                             .keyboardType(.decimalPad)
@@ -296,7 +333,7 @@ struct AddCardView: View {
                             .frame(width: 50)
                     }
                     HStack {
-                        Text("外币\(capPeriod == .monthly ? "月" : "年")上限")
+                        Text(foreignCapTitle)
                             .font(.caption).foregroundColor(.secondary)
                         Spacer()
                         TextField("无上限", text: $foreignBaseCapStr)
@@ -308,11 +345,11 @@ struct AddCardView: View {
                 
                 // 5. 规则设置 - 类别
                 Section(header: Text("类别加成 (额外叠加)")) {
-                    CategoryInputRow(name: "餐饮", rate: $diningRateStr, cap: $diningCapStr)
-                    CategoryInputRow(name: "超市", rate: $groceryRateStr, cap: $groceryCapStr)
-                    CategoryInputRow(name: "出行", rate: $travelRateStr, cap: $travelCapStr)
-                    CategoryInputRow(name: "数码", rate: $digitalRateStr, cap: $digitalCapStr)
-                    CategoryInputRow(name: "其他", rate: $otherRateStr, cap: $otherCapStr)
+                    CategoryInputRow(name: "餐饮", rate: $diningRateStr, cap: $diningCapStr, capUnit: rewardLabel)
+                    CategoryInputRow(name: "超市", rate: $groceryRateStr, cap: $groceryCapStr, capUnit: rewardLabel)
+                    CategoryInputRow(name: "出行", rate: $travelRateStr, cap: $travelCapStr, capUnit: rewardLabel)
+                    CategoryInputRow(name: "数码", rate: $digitalRateStr, cap: $digitalCapStr, capUnit: rewardLabel)
+                    CategoryInputRow(name: "其他", rate: $otherRateStr, cap: $otherCapStr, capUnit: rewardLabel)
                 }
                 
                 // 6. 规则设置 - 支付方式
@@ -343,7 +380,7 @@ struct AddCardView: View {
                                 
                                 Spacer()
                                 
-                                Text("上限:")
+                                Text(rewardType == .points ? "积分上限:" : "上限:")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 
@@ -387,6 +424,14 @@ struct AddCardView: View {
                 if let image = newImage {
                     self.cardImageData = image.jpegData(compressionQuality: 0.7)
                 }
+            }
+            .onChange(of: rewardType) { _, newValue in
+                if newValue != .points {
+                    selectedPointID = nil
+                }
+            }
+            .sheet(isPresented: $showPointLibrary) {
+                PointLibraryView()
             }
         }
     }
@@ -450,6 +495,8 @@ struct AddCardView: View {
         
         let finalPaymentRates = paymentMethodRates.mapValues { $0 / 100.0 }
         let finalPaymentCaps = paymentCaps
+        let selectedPoint = points.first { $0.id == selectedPointID }
+        let resolvedPointProgram = rewardType == .points ? selectedPoint : nil
         
         if let existingCard = cardToEdit {
             existingCard.bankName = bankName
@@ -470,6 +517,8 @@ struct AddCardView: View {
             existingCard.paymentMethodRates = finalPaymentRates
             existingCard.paymentCaps = finalPaymentCaps
             existingCard.cardImageData = cardImageData
+            existingCard.rewardType = rewardType
+            existingCard.pointProgram = resolvedPointProgram
             
             NotificationManager.shared.scheduleNotification(for: existingCard)
             
@@ -492,6 +541,8 @@ struct AddCardView: View {
                 repaymentDay: rDay,
                 paymentMethodRates: finalPaymentRates,
                 paymentCaps: finalPaymentCaps,
+                rewardType: rewardType,
+                pointProgram: resolvedPointProgram,
                 cardImageData: cardImageData
             )
             context.insert(newCard)
@@ -503,11 +554,46 @@ struct AddCardView: View {
         dismiss()
         onSaved?()
     }
+
+    private var rewardLabel: String {
+        rewardType == .points ? "积分" : "返现"
+    }
+
+    private var capPeriodTitle: String {
+        rewardType == .points ? "积分上限周期" : "返现上限周期"
+    }
+
+    private var baseSectionTitle: String {
+        rewardType == .points ? "基础积分 (所有消费)" : "基础返现 (所有消费)"
+    }
+
+    private var localRateTitle: String {
+        rewardType == .points ? "本币积分率 (%)" : "本币返现率 (%)"
+    }
+
+    private var foreignRateTitle: String {
+        rewardType == .points ? "外币积分率 (%)" : "外币返现率 (%)"
+    }
+
+    private var localCapTitle: String {
+        if rewardType == .points {
+            return capPeriod == .monthly ? "本币月积分上限" : "本币年积分上限"
+        }
+        return capPeriod == .monthly ? "本币月上限" : "本币年上限"
+    }
+
+    private var foreignCapTitle: String {
+        if rewardType == .points {
+            return capPeriod == .monthly ? "外币月积分上限" : "外币年积分上限"
+        }
+        return capPeriod == .monthly ? "外币月上限" : "外币年上限"
+    }
     
     struct CategoryInputRow: View {
         let name: String
         @Binding var rate: String
         @Binding var cap: String
+        let capUnit: String
         
         var body: some View {
             VStack(spacing: 8) {
@@ -525,7 +611,7 @@ struct AddCardView: View {
                         .background(Color(uiColor: .secondarySystemBackground))
                         .cornerRadius(5)
                     
-                    Text("上限")
+                    Text(capUnit == "积分" ? "积分上限" : "上限")
                         .font(.caption).foregroundColor(.gray)
                     TextField("无", text: $cap)
                         .keyboardType(.numberPad)

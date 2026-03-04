@@ -143,17 +143,24 @@ struct TransactionDetailView: View {
                 
                 // MARK: - 4. 返现分析
                 Section("返现分析") {
+                    let isPoints = transaction.card?.rewardType == .points
+                    let rewardCurrency = transaction.card?.issueRegion.currencyCode ?? "CNY"
+                    
                     HStack {
                         Label {
-                            Text("预计返现")
+                            Text(isPoints ? "预计积分价值" : "预计返现")
                         } icon: {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.yellow)
                         }
                         Spacer()
-                        Text("+\(String(format: "%.2f", transaction.cashbackamount))")
+                        Text("+\(transaction.cashbackamount.formatted(.currency(code: rewardCurrency)))")
                             .font(.headline)
                             .foregroundColor(.green)
+                    }
+                    
+                    if isPoints {
+                        DetailRow(title: "积分数", value: String(transaction.pointsEarned), icon: "star.circle")
                     }
                     
                     if transaction.billingAmount > 0 {

@@ -109,6 +109,11 @@ struct CSVHelper {
                 }
             }
             
+            var pointsEarned: Int = 0
+            if columns.count > 10 {
+                pointsEarned = Int(columns[10].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            }
+            
             let date = dateStr.toDate()
             let category = categoryMap[categoryName] ?? .other
             let cleanRegionName = regionName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,6 +153,7 @@ struct CSVHelper {
                 receiptData: receiptData,
                 billingAmount: billing,
                 cashbackAmount: cashback,
+                pointsEarned: pointsEarned,
                 paymentMethod: paymentMethod // 👈 写入数据库
             )
             
@@ -260,7 +266,7 @@ extension Array where Element == Transaction {
     
     func generateCSV() -> String {
         // 👇 修改表头：末尾增加 "支付方式"
-        var csvString = "交易时间,商户名称,消费类别,消费金额(原币),入账金额(本币),返现金额(本币),支付卡片,卡片尾号,消费地区,支付方式\n"
+        var csvString = "交易时间,商户名称,消费类别,消费金额(原币),入账金额(本币),返现金额(本币),支付卡片,卡片尾号,消费地区,支付方式,积分数\n"
         
         for t in self {
             let date = t.dateString
@@ -277,9 +283,10 @@ extension Array where Element == Transaction {
             
             // 👇 新增：获取支付方式的 rawValue (如 "applePay")
             let paymentMethod = t.paymentMethod.rawValue
+            let pointsEarned = String(t.pointsEarned)
             
             // 👇 拼接到最后
-            let row = "\(date),\(merchant),\(category),\(amount),\(billing),\(cashback),\(cardName),\(cardNumber),\(region),\(paymentMethod)\n"
+            let row = "\(date),\(merchant),\(category),\(amount),\(billing),\(cashback),\(cardName),\(cardNumber),\(region),\(paymentMethod),\(pointsEarned)\n"
             csvString.append(row)
         }
         return csvString

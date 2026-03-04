@@ -13,6 +13,20 @@ enum CapPeriod: Codable {
     case monthly
 }
 
+enum RewardType: String, Codable, CaseIterable {
+    case cashback
+    case points
+
+    var displayName: String {
+        switch self {
+        case .cashback:
+            return "返现"
+        case .points:
+            return "积分"
+        }
+    }
+}
+
 @Model // 👈 1. 变身数据库表
 class CreditCard: Identifiable {
     // 自动生成的主键，不需要手动 id 了
@@ -34,6 +48,9 @@ class CreditCard: Identifiable {
     // 如果这里报错，我们需要换成 JSON String。目前先尝试直接存。
     var specialRates: [Category: Double]
     var paymentMethodRates: [PaymentMethod: Double] = [:] // 针对支付方式的加成费率
+
+    var rewardType: RewardType = RewardType.cashback
+    var pointProgram: Point?
 
     
     var issueRegion: Region
@@ -81,6 +98,8 @@ class CreditCard: Identifiable {
         isRemindOpen: Bool = true,
         paymentMethodRates: [PaymentMethod: Double] = [:],
         paymentCaps: [PaymentMethod: Double] = [:],
+        rewardType: RewardType = .cashback,
+        pointProgram: Point? = nil,
         cardImageData: Data? = nil // 👈 新增参数
     ) {
         self.bankName = bankName
@@ -102,6 +121,8 @@ class CreditCard: Identifiable {
         self.isRemindOpen = isRemindOpen
         self.paymentMethodRates = paymentMethodRates
         self.paymentCaps = paymentCaps
+        self.rewardType = rewardType
+        self.pointProgram = pointProgram
         self.cardImageData = cardImageData // 👈 赋值
     }
     
@@ -228,6 +249,112 @@ class CreditCard: Identifiable {
         
         // --- 第五步：汇总返回 ---
         return finalBase + finalCategoryBonus + finalPaymentBonus
+    }
+    
+    func calculateCappedPoints(
+        amount: Double,
+        category: Category,
+        location: Region,
+        date: Date,
+        paymentMethod: PaymentMethod,
+        pointValueInCardCurrency: Double,
+        transactionToExclude: Transaction? = nil
+    ) -> (points: Int, value: Double) {
+        guard pointValueInCardCurrency > 0 else {
+            return (points: 0, value: 0)
+        }
+        
+        let isForeign = (location != issueRegion)
+        
+        var baseRate = defaultRate
+        if isForeign, let fr = foreignCurrencyRate, fr > 0 {
+            baseRate = fr
+        }
+        
+        let potentialBasePoints = (amount * baseRate) / pointValueInCardCurrency
+        let categoryBonusRate = specialRates[category] ?? 0.0
+        let paymentBonusRate = paymentMethodRates[paymentMethod] ?? 0.0
+        
+        let potentialCategoryPoints = (amount * categoryBonusRate) / pointValueInCardCurrency
+        let potentialPaymentPoints = (amount * paymentBonusRate) / pointValueInCardCurrency
+        
+        let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
+        let categoryCapLimit = categoryCaps[category] ?? 0.0
+        let paymentCapLimit = paymentCaps[paymentMethod] ?? 0.0
+        
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: date)
+        let currentMonth = calendar.component(.month, from: date)
+        
+        let periodTransactions = (transactions ?? []).filter { t in
+            let year = calendar.component(.year, from: t.date)
+            guard year == currentYear else { return false }
+            
+            let isNotSelf = (t != transactionToExclude)
+            guard isNotSelf else { return false }
+            
+            switch capPeriod {
+            case .yearly:
+                return true
+            case .monthly:
+                let month = calendar.component(.month, from: t.date)
+                return month == currentMonth
+            }
+        }
+        
+        var usedBasePoints: Double = 0
+        if baseCapLimit > 0 {
+            usedBasePoints = periodTransactions
+                .filter { ($0.location != self.issueRegion) == isForeign }
+                .reduce(0) { sum, t in
+                    let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
+                    return sum + (t.billingAmount * tBaseRate / pointValueInCardCurrency)
+                }
+        }
+        
+        var usedCategoryPoints: Double = 0
+        if categoryCapLimit > 0 {
+            usedCategoryPoints = periodTransactions
+                .filter { $0.category == category }
+                .reduce(0) { sum, t in
+                    let tBonusRate = specialRates[t.category] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate / pointValueInCardCurrency)
+                }
+        }
+        
+        var usedPaymentPoints: Double = 0
+        if paymentCapLimit > 0 {
+            usedPaymentPoints = periodTransactions
+                .filter { $0.paymentMethod == paymentMethod }
+                .reduce(0) { sum, t in
+                    let tBonusRate = paymentMethodRates[t.paymentMethod] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate / pointValueInCardCurrency)
+                }
+        }
+        
+        var finalBasePoints = potentialBasePoints
+        if baseCapLimit > 0 {
+            let remaining = max(0, baseCapLimit - usedBasePoints)
+            finalBasePoints = min(potentialBasePoints, remaining)
+        }
+        
+        var finalCategoryPoints = potentialCategoryPoints
+        if categoryCapLimit > 0 {
+            let remaining = max(0, categoryCapLimit - usedCategoryPoints)
+            finalCategoryPoints = min(potentialCategoryPoints, remaining)
+        }
+        
+        var finalPaymentPoints = potentialPaymentPoints
+        if paymentCapLimit > 0 {
+            let remaining = max(0, paymentCapLimit - usedPaymentPoints)
+            finalPaymentPoints = min(potentialPaymentPoints, remaining)
+        }
+        
+        let totalPoints = finalBasePoints + finalCategoryPoints + finalPaymentPoints
+        let pointsEarned = max(0, Int(floor(totalPoints)))
+        let value = Double(pointsEarned) * pointValueInCardCurrency
+        
+        return (points: pointsEarned, value: value)
     }
     func calculateCappedCashback(amount: Double, category: Category, location: Region, date: Date) -> Double {
             

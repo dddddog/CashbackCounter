@@ -266,6 +266,9 @@ struct BillHomeView: View {
                         Button { showFileImporter = true } label: {
                             Label("导入账单", systemImage: "square.and.arrow.down")
                         }
+                        Button { showStatementImporter = true } label: {
+                            Label("导入结单", systemImage: "square.and.arrow.down")
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle").font(.system(size: 18))
                     }

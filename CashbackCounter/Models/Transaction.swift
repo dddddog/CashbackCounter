@@ -12,6 +12,7 @@ class Transaction: Identifiable {
     
     var date: Date
     var cashbackamount: Double
+    var pointsEarned: Int
     var rate: Double
     
     var card: CreditCard?
@@ -34,6 +35,7 @@ class Transaction: Identifiable {
          receiptData: Data? = nil,
          billingAmount: Double? = nil,
          cashbackAmount: Double? = nil,
+         pointsEarned: Int = 0,
          // 新增参数：设置默认值 .offline，这样旧代码不需要改动即可编译
          paymentMethod: PaymentMethod = .offline
     ) {
@@ -63,6 +65,8 @@ class Transaction: Identifiable {
             self.cashbackamount = finalBilling * nominalRate
             self.rate = nominalRate
         }
+
+        self.pointsEarned = pointsEarned
     }
     
     var color: Color { category.color }

@@ -25,6 +25,7 @@ struct AddTransactionView: View {
     
     // 👇 1. 确保有这个状态变量
     @State private var paymentMethod: PaymentMethod = .offline
+    @State private var rewardPreview: RewardPreview?
     
     // AI 分析状态
     @State private var isAnalyzing: Bool = false
@@ -231,13 +232,13 @@ struct AddTransactionView: View {
                 // --- 第四组：实时预算返现 ---
                 Section {
                     HStack {
-                        Text("预计返现")
+                        let isPoints = cards.indices.contains(selectedCardIndex) && cards[selectedCardIndex].rewardType == .points
+                        Text(isPoints ? "预计积分价值" : "预计返现")
                         Spacer()
                         
-                        // 使用刚才抽离的计算属性
-                        if let preview = cashbackPreview {
+                        if let preview = rewardPreview {
                             HStack(spacing: 4) {
-                                Text("\(currentCurrencySymbol)\(String(format: "%.2f", preview.amount))")
+                                Text("\(currentCurrencySymbol)\(String(format: "%.2f", preview.value))")
                                     .foregroundColor(preview.isCapped ? .orange : .green)
                                     .fontWeight(.bold)
                                 
@@ -259,7 +260,9 @@ struct AddTransactionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { saveTransaction() }
+                    Button("保存") {
+                        Task { await saveTransaction() }
+                    }
                         .disabled(merchant.isEmpty || amount.isEmpty || cards.isEmpty)
                 }
             }
@@ -275,16 +278,31 @@ struct AddTransactionView: View {
                         }
                     }
                 }
+                updateRewardPreview()
             }
             .onChange(of: cards.count) { _, _ in
                 applyPrefillCardSelection()
+                updateRewardPreview()
             }
             .onChange(of: receiptImage) { _, newImage in
                 if newImage != nil { analyzeReceipt() }
             }
-            .onChange(of: amount) { updateBillingAmount() }
-            .onChange(of: location) { updateBillingAmount() }
-            .onChange(of: selectedCardIndex) { updateBillingAmount() }
+            .onChange(of: amount) {
+                updateBillingAmount()
+                updateRewardPreview()
+            }
+            .onChange(of: location) {
+                updateBillingAmount()
+                updateRewardPreview()
+            }
+            .onChange(of: selectedCardIndex) {
+                updateBillingAmount()
+                updateRewardPreview()
+            }
+            .onChange(of: billingAmountStr) { updateRewardPreview() }
+            .onChange(of: selectedCategory) { updateRewardPreview() }
+            .onChange(of: paymentMethod) { updateRewardPreview() }
+            .onChange(of: date) { updateRewardPreview() }
             .scrollDismissesKeyboard(.interactively)
             .sheet(isPresented: $showImagePicker) {
                 ImagePicker(selectedImage: $receiptImage, sourceType: .photoLibrary)
@@ -293,6 +311,12 @@ struct AddTransactionView: View {
     }
     
     // --- 4. AI 分析逻辑 (保持不变，或在此处根据 metadata 自动推断 paymentMethod) ---
+    private struct RewardPreview {
+        let value: Double
+        let points: Int
+        let isCapped: Bool
+    }
+    
     private func applyPrefillCardSelection() {
         guard transactionToEdit == nil else { return }
         guard let prefillCardLast4 else { return }
@@ -330,42 +354,73 @@ struct AddTransactionView: View {
         }
     }
     // MARK: - 抽离的计算逻辑
-    // 返回值：(返现金额, 是否被上限卡住)
-    private var cashbackPreview: (amount: Double, isCapped: Bool)? {
-        // 1. 基础校验
+    @MainActor
+    private func updateRewardPreview() {
         guard let amountDouble = Double(amount),
               cards.indices.contains(selectedCardIndex) else {
-            return nil
+            rewardPreview = nil
+            return
         }
         
         let card = cards[selectedCardIndex]
-        // 优先使用 billingAmountStr (如果有值)，否则用 amount
         let finalAmount = Double(billingAmountStr) ?? amountDouble
         
-        // 2. 计算实际返现 (调用你的 Core Function)
-        let cashback = card.calculateCappedCashback(
-            amount: finalAmount,
-            category: selectedCategory,
-            location: location,
-            date: date,
-            paymentMethod: paymentMethod,
-            transactionToExclude: transactionToEdit
-        )
-        
-        // 3. 计算理论返现 (用于判断颜色)
-        // ⚠️ 注意：既然你修改了 getRate，这里请根据你的 getRate 签名来写
-        // 情况 A：如果你把 paymentMethod 加进去了，就用：
-        let theoreticalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
-        
-        let theoretical = finalAmount * theoreticalRate
-        
-        // 判断是否被 Cap (实际 < 理论 - 误差)
-        let isCapped = cashback < (theoretical - 0.01)
-        
-        return (cashback, isCapped)
+        if card.rewardType == .points {
+            rewardPreview = nil
+            Task {
+                let pointValue = await resolvePointValueInCardCurrency(for: card)
+                let result = card.calculateCappedPoints(
+                    amount: finalAmount,
+                    category: selectedCategory,
+                    location: location,
+                    date: date,
+                    paymentMethod: paymentMethod,
+                    pointValueInCardCurrency: pointValue,
+                    transactionToExclude: transactionToEdit
+                )
+                
+                let theoreticalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
+                let theoreticalValue = finalAmount * theoreticalRate
+                let theoreticalPoints = pointValue > 0 ? Int(floor(theoreticalValue / pointValue)) : 0
+                let isCapped = result.points < theoreticalPoints
+                
+                await MainActor.run {
+                    rewardPreview = RewardPreview(value: result.value, points: result.points, isCapped: isCapped)
+                }
+            }
+        } else {
+            let cashback = card.calculateCappedCashback(
+                amount: finalAmount,
+                category: selectedCategory,
+                location: location,
+                date: date,
+                paymentMethod: paymentMethod,
+                transactionToExclude: transactionToEdit
+            )
+            
+            let theoreticalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
+            let theoretical = finalAmount * theoreticalRate
+            let isCapped = cashback < (theoretical - 0.01)
+            rewardPreview = RewardPreview(value: cashback, points: 0, isCapped: isCapped)
+        }
+    }
+    
+    private func resolvePointValueInCardCurrency(for card: CreditCard) async -> Double {
+        guard let pointProgram = card.pointProgram else { return 0 }
+        let pointCurrency = pointProgram.valueCurrencyCode
+        let cardCurrency = card.issueRegion.currencyCode
+        if pointCurrency == cardCurrency {
+            return pointProgram.pointValue
+        }
+        let rates = await CurrencyService.getRates(base: pointCurrency)
+        if let rate = rates[cardCurrency], rate > 0 {
+            return pointProgram.pointValue * rate
+        }
+        return pointProgram.pointValue
     }
     // --- 核心保存逻辑 ---
-    func saveTransaction() {
+    @MainActor
+    func saveTransaction() async {
         guard let amountDouble = Double(amount) else { return }
         let billingDouble = Double(billingAmountStr) ?? amountDouble
         
@@ -373,21 +428,34 @@ struct AddTransactionView: View {
             let card = cards[selectedCardIndex]
             let imageData = receiptImage?.jpegData(compressionQuality: 0.5)
             
-            // 1. 计算最终返现 (包含 PaymentMethod)
-            let finalCashback = card.calculateCappedCashback(
-                amount: billingDouble,
-                category: selectedCategory,
-                location: location,
-                date: date,
-                paymentMethod: paymentMethod, // 👈 传入
-                transactionToExclude: transactionToEdit
-            )
+            var finalCashback: Double = 0
+            var pointsEarned: Int = 0
             
-            // 2. 计算名义费率
-            // 如果你的 CreditCard.getRate 还没更新支持 payment，这里我们手动加一下
-            // 确保 CreditCard 类里有 paymentMethodRates 字典
-            let baseRate = card.getRate(for: selectedCategory, location: location,payment: paymentMethod)
-            let nominalRate = baseRate
+            if card.rewardType == .points {
+                let pointValue = await resolvePointValueInCardCurrency(for: card)
+                let result = card.calculateCappedPoints(
+                    amount: billingDouble,
+                    category: selectedCategory,
+                    location: location,
+                    date: date,
+                    paymentMethod: paymentMethod,
+                    pointValueInCardCurrency: pointValue,
+                    transactionToExclude: transactionToEdit
+                )
+                finalCashback = result.value
+                pointsEarned = result.points
+            } else {
+                finalCashback = card.calculateCappedCashback(
+                    amount: billingDouble,
+                    category: selectedCategory,
+                    location: location,
+                    date: date,
+                    paymentMethod: paymentMethod,
+                    transactionToExclude: transactionToEdit
+                )
+            }
+            
+            let nominalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
             
             if let t = transactionToEdit {
                 // --- 编辑模式 ---
@@ -402,7 +470,8 @@ struct AddTransactionView: View {
                     t.category != selectedCategory ||
                     t.paymentMethod != paymentMethod || // 👈 检查消费方式变化
                     t.date != date ||
-                    t.cashbackamount != finalCashback {
+                    t.cashbackamount != finalCashback ||
+                    t.pointsEarned != pointsEarned {
                     
                     t.card = card
                     t.billingAmount = billingDouble
@@ -411,9 +480,10 @@ struct AddTransactionView: View {
                     
                     t.rate = nominalRate
                     t.cashbackamount = finalCashback
+                    t.pointsEarned = pointsEarned
                 }
                 
-                if let img = imageData { t.receiptData = img }else {
+                if let img = imageData { t.receiptData = img } else {
                     t.receiptData = nil
                 }
                 
@@ -429,6 +499,7 @@ struct AddTransactionView: View {
                     receiptData: imageData,
                     billingAmount: billingDouble,
                     cashbackAmount: finalCashback,
+                    pointsEarned: pointsEarned,
                     paymentMethod: paymentMethod // 👈 写入数据库
                 )
                 context.insert(newTransaction)

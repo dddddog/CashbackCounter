@@ -104,12 +104,13 @@ struct TransactionRow: View {
                         .foregroundColor(.green)
                     } else if transaction.cashbackamount > 0 {
                         // 普通返现
+                        let isPoints = transaction.card?.rewardType == .points
                         HStack(spacing: 2) {
-                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                            Image(systemName: isPoints ? "star.circle.fill" : "arrow.uturn.backward.circle.fill")
                                 .font(.system(size: 10))
-                            Text("返 \(cashbackText)")
+                            Text("\(isPoints ? "值" : "返") \(cashbackText)")
                         }
-                        .foregroundColor(.orange)
+                        .foregroundColor(isPoints ? .blue : .orange)
                     } else {
                         // 占位符：如果是 0 返现，显示透明文字或者高度为0
                         // 为了保持绝对对齐，建议用 Text(" ").frame(height: 14) 占位
