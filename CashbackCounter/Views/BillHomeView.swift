@@ -31,6 +31,7 @@ struct BillHomeView: View {
     
     // 👇 新增：搜索文本状态
     @State private var searchText = ""
+    @State private var isSearchPresented = false
 
     // 趋势图与导入状态
     @Query var cards: [CreditCard]
@@ -47,6 +48,11 @@ struct BillHomeView: View {
     
     // 5. 核心筛选逻辑 (不含支付方式)
     var filteredTransactions: [Transaction] {
+        let query = trimmedSearchText
+        if isSearchingActive {
+            return dbTransactions.filter { matchesSearch($0, query: query) }
+        }
+
         // 第一步：日期筛选
         var results = showAll ? dbTransactions : dbTransactions.filter { t in
             if isWholeYear {
@@ -65,14 +71,6 @@ struct BillHomeView: View {
         if showIncomeOnly {
             results = results.filter { ($0.incomes?.isEmpty == false) }
         }
-        
-        // 👇 第四步：新增搜索过滤逻辑
-        if !searchText.isEmpty {
-            results = results.filter { t in
-                // 不区分大小写的商户名搜索
-                t.merchant.localizedCaseInsensitiveContains(searchText)
-            }
-        }
 
         return results
     }
@@ -84,6 +82,213 @@ struct BillHomeView: View {
         } else {
             return selectedDate.formatted(.dateTime.year().month())
         }
+    }
+
+    private var trimmedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSearchingActive: Bool {
+        !trimmedSearchText.isEmpty
+    }
+
+    private var isSearchFieldActive: Bool {
+        isSearchPresented || isSearchingActive
+    }
+
+    private var expenseTitle: LocalizedStringKey {
+        if isSearchingActive || showAll {
+            return "总支出"
+        }
+        return isWholeYear ? "本年支出" : "本月支出"
+    }
+
+    private var cashbackTitle: LocalizedStringKey {
+        if isSearchingActive || showAll {
+            return "总返现"
+        }
+        return isWholeYear ? "本年返现" : "本月返现"
+    }
+
+    private func matchesSearch(_ transaction: Transaction, query: String) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return true }
+
+        func contains(_ value: String) -> Bool {
+            value.localizedCaseInsensitiveContains(needle)
+        }
+
+        var candidates: [String] = [
+            transaction.merchant,
+            transaction.category.displayName,
+            transaction.location.currencyCode,
+            transaction.paymentMethod.displayName,
+            transaction.dateString,
+            String(format: "%.2f", transaction.amount),
+            String(format: "%.2f", transaction.billingAmount),
+            String(format: "%.2f", transaction.cashbackamount),
+            String(transaction.pointsEarned),
+            String(format: "%.2f", transaction.rate)
+        ]
+
+        if let card = transaction.card {
+            candidates.append(contentsOf: [
+                card.bankName,
+                card.type,
+                card.endNum,
+                card.issueRegion.rawValue,
+                card.issueRegion.currencyCode
+            ])
+        }
+
+        if let incomes = transaction.incomes, !incomes.isEmpty {
+            for income in incomes {
+                candidates.append(contentsOf: [
+                    income.detail,
+                    income.platform,
+                    income.location.rawValue,
+                    income.location.currencyCode,
+                    income.dateString,
+                    String(format: "%.2f", income.amount)
+                ])
+            }
+        }
+
+        return candidates.contains { contains($0) }
+    }
+
+    @ViewBuilder
+    private var filterBar: some View {
+        if !isSearchFieldActive {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    // 左侧留白
+                    Spacer().frame(width: 16)
+                    
+                    // A. 类别筛选
+                    Menu {
+                        Button(action: { selectedCategory = nil }) {
+                            Label("全部种类", systemImage: "checkmark.circle")
+                        }
+                        ForEach(Category.allCases, id: \.self) { category in
+                            Button(action: { selectedCategory = category }) {
+                                Label(category.displayName, systemImage: category.iconName)
+                            }
+                        }
+                    } label: {
+                        FilterChip(
+                            title: selectedCategory?.displayName ?? "全部种类",
+                            icon: selectedCategory?.iconName ?? "line.3.horizontal.decrease.circle",
+                            isSelected: selectedCategory != nil
+                        )
+                    }
+
+                    // B. 收入筛选
+                    Button(action: { showIncomeOnly.toggle() }) {
+                        FilterChip(
+                            title: "收入单",
+                            icon: "tray.and.arrow.down.fill",
+                            isSelected: showIncomeOnly
+                        )
+                    }
+
+                    // C. 日期筛选
+                    Button(action: { showDatePicker = true }) {
+                        FilterChip(
+                            title: dateButtonText,
+                            icon: "calendar",
+                            isSelected: !showAll
+                        )
+                    }
+                    
+                    // 右侧留白
+                    Spacer().frame(width: 16)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var statsBar: some View {
+        HStack(spacing: 15) {
+            // 支出统计 -> 红色趋势图
+            Button(action: { showExpenseSheet = true }) {
+                StatBox(
+                    title: expenseTitle,
+                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalExpense),
+                    icon: "arrow.down.circle.fill", color: .red
+                )
+                .overlay(
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundColor(.gray.opacity(0.5)).padding(.trailing, 10),
+                    alignment: .trailing
+                )
+            }
+            .buttonStyle(.plain)
+            
+            // 返现统计 -> 绿色趋势图
+            Button(action: { showTrendSheet = true }) {
+                StatBox(
+                    title: cashbackTitle,
+                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalCashback),
+                    icon: "arrow.up.circle.fill", color: .green
+                )
+                .overlay(
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundColor(.gray.opacity(0.5)).padding(.trailing, 10),
+                    alignment: .trailing
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+        .padding(.top)
+    }
+
+    @ViewBuilder
+    private var transactionList: some View {
+        LazyVStack(spacing: 15) {
+            ForEach(filteredTransactions) { item in
+                VStack(alignment: .leading, spacing: 8) {
+                    TransactionRow(transaction: item, exchangeRates: exchangeRates)
+                        .onTapGesture { selectedTransaction = item }
+                        .contextMenu {
+                            Button { transactionToEdit = item } label: { Label("编辑", systemImage: "pencil") }
+                            Button { incomeTargetTransaction = item } label: { Label("添加收入", systemImage: "plus.rectangle.on.rectangle") }
+                            Divider()
+                            Button(role: .destructive) { context.delete(item) } label: { Label("删除", systemImage: "trash") }
+                        }
+                    
+                    // 显示关联收入
+                    if let incomes = item.incomes, !incomes.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(incomes.sorted(by: { $0.date > $1.date })) { income in
+                                IncomeRow(income: income)
+                                    .contextMenu {
+                                        Button { incomeToEdit = income } label: { Label("编辑收入", systemImage: "pencil") }
+                                        Button(role: .destructive) {
+                                            context.delete(income)
+                                            try? context.save() // 强制保存以更新 UI
+                                        } label: { Label("删除", systemImage: "trash") }
+                                    }
+                            }
+                        }
+                        .padding(.leading, 30)
+                    }
+                }
+            }
+            
+            // 空状态提示
+            if filteredTransactions.isEmpty {
+                ContentUnavailableView(
+                    LocalizedStringKey(isSearchingActive ? "未找到结果" : "暂无账单"),
+                    systemImage: isSearchingActive ? "magnifyingglass" : "list.bullet.clipboard",
+                    description: Text(isSearchingActive ? "尝试更换关键词" : "该筛选条件下没有交易记录")
+                )
+                .padding(.top, 40)
+            }
+        }
+        .padding(.horizontal)
     }
     
     // 计算总支出
@@ -124,134 +329,20 @@ struct BillHomeView: View {
                     VStack(spacing: 20) {
                         
                         // 1. 统计条 (点击数字可查看趋势)
-                        HStack(spacing: 15) {
-                            // 支出统计 -> 红色趋势图
-                            Button(action: { showExpenseSheet = true }) {
-                                StatBox(
-                                    title: showAll ? "总支出" : (isWholeYear ? "本年支出" : "本月支出"),
-                                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalExpense),
-                                    icon: "arrow.down.circle.fill", color: .red
-                                )
-                                .overlay(
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption).foregroundColor(.gray.opacity(0.5)).padding(.trailing, 10),
-                                    alignment: .trailing
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            
-                            // 返现统计 -> 绿色趋势图
-                            Button(action: { showTrendSheet = true }) {
-                                StatBox(
-                                    title: showAll ? "总返现" : (isWholeYear ? "本年返现" : "本月返现"),
-                                    amount: exchangeRates.isEmpty ? "..." : String(format: "%.2f", totalCashback),
-                                    icon: "arrow.up.circle.fill", color: .green
-                                )
-                                .overlay(
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption).foregroundColor(.gray.opacity(0.5)).padding(.trailing, 10),
-                                    alignment: .trailing
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal).padding(.top)
+                        statsBar
                         
                         // 2. 控制栏 (筛选器) - 使用 ScrollView 优化布局
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                // 左侧留白
-                                Spacer().frame(width: 16)
-                                
-                                // A. 类别筛选
-                                Menu {
-                                    Button(action: { selectedCategory = nil }) {
-                                        Label("全部种类", systemImage: "checkmark.circle")
-                                    }
-                                    ForEach(Category.allCases, id: \.self) { category in
-                                        Button(action: { selectedCategory = category }) {
-                                            Label(category.displayName, systemImage: category.iconName)
-                                        }
-                                    }
-                                } label: {
-                                    FilterChip(
-                                        title: selectedCategory?.displayName ?? "全部种类",
-                                        icon: selectedCategory?.iconName ?? "line.3.horizontal.decrease.circle",
-                                        isSelected: selectedCategory != nil
-                                    )
-                                }
-
-                                // B. 收入筛选
-                                Button(action: { showIncomeOnly.toggle() }) {
-                                    FilterChip(
-                                        title: "收入单",
-                                        icon: "tray.and.arrow.down.fill",
-                                        isSelected: showIncomeOnly
-                                    )
-                                }
-
-                                // C. 日期筛选
-                                Button(action: { showDatePicker = true }) {
-                                    FilterChip(
-                                        title: dateButtonText,
-                                        icon: "calendar",
-                                        isSelected: !showAll
-                                    )
-                                }
-                                
-                                // 右侧留白
-                                Spacer().frame(width: 16)
-                            }
-                        }
+                        filterBar
                         
                         // 3. 交易列表
-                        LazyVStack(spacing: 15) {
-                            ForEach(filteredTransactions) { item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    TransactionRow(transaction: item, exchangeRates: exchangeRates)
-                                        .onTapGesture { selectedTransaction = item }
-                                        .contextMenu {
-                                            Button { transactionToEdit = item } label: { Label("编辑", systemImage: "pencil") }
-                                            Button { incomeTargetTransaction = item } label: { Label("添加收入", systemImage: "plus.rectangle.on.rectangle") }
-                                            Divider()
-                                            Button(role: .destructive) { context.delete(item) } label: { Label("删除", systemImage: "trash") }
-                                        }
-                                    
-                                    // 显示关联收入
-                                    if let incomes = item.incomes, !incomes.isEmpty {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            ForEach(incomes.sorted(by: { $0.date > $1.date })) { income in
-                                                IncomeRow(income: income)
-                                                    .contextMenu {
-                                                        Button { incomeToEdit = income } label: { Label("编辑收入", systemImage: "pencil") }
-                                                        Button(role: .destructive) {
-                                                            context.delete(income)
-                                                            try? context.save() // 强制保存以更新 UI
-                                                        } label: { Label("删除", systemImage: "trash") }
-                                                    }
-                                            }
-                                        }
-                                        .padding(.leading, 30)
-                                    }
-                                }
-                            }
-                            
-                            // 空状态提示
-                            if filteredTransactions.isEmpty {
-                                ContentUnavailableView(
-                                    searchText.isEmpty ? "暂无账单" : "未找到结果",
-                                    systemImage: searchText.isEmpty ? "list.bullet.clipboard" : "magnifyingglass",
-                                    description: Text(searchText.isEmpty ? "该筛选条件下没有交易记录" : "尝试更换关键词或检查筛选条件")
-                                )
-                                .padding(.top, 40)
-                            }
-                        }
-                        .padding(.horizontal)
+                        transactionList
                     }
                 }
             }
             .navigationTitle("Cashback Counter")
             .navigationBarTitleDisplayMode(.inline)
+            // 👇 新增：搜索框
+            .searchable(text: $searchText, isPresented: $isSearchPresented, placement: .automatic, prompt: "搜索全部信息")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -275,8 +366,7 @@ struct BillHomeView: View {
                     }
                 }
             }
-            // 👇 新增：搜索框
-            .searchable(text: $searchText, placement: .automatic, prompt: "搜索商户")
+
             // 文件导入器
             .fileImporter(
                 isPresented: $showFileImporter,

@@ -2003,7 +2003,11 @@
         }
       }
     },
+    "尝试更换关键词" : {
+
+    },
     "尝试更换关键词或检查筛选条件" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2302,7 +2306,11 @@
         }
       }
     },
+    "搜索全部信息" : {
+
+    },
     "搜索商户" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2677,6 +2685,7 @@
 
     },
     "暂无账单" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2721,6 +2730,7 @@
       }
     },
     "未找到结果" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
