@@ -87,7 +87,7 @@ struct OCRService {
         if upperText.contains("CNY") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
         if upperText.contains("USD") { return .us }
         if upperText.contains("MOP") || upperText.contains("macau") { return .mo }
-        if upperText.contains("EUR") || upperText.contains("EURO") { return .other }
+        if upperText.contains("EUR") || upperText.contains("EURO") || upperText.contains("€"){ return .other }
         if upperText.contains("GBP") || upperText.contains("uk") || upperText.contains("£") { return .uk }
         
         // 2. 弱特征：看地名或特殊符号 (如果货币没找到)

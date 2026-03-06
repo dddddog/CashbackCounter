@@ -1,11 +1,34 @@
 import Foundation
 
-// 1. 定义 API 响应结构 (保持不变)
-struct FrankfurterLatestResponse: Codable {
-    let amount: Double
-    let base: String
+// 1. 定义 API 响应结构 (适配动态币种键)
+struct FrankfurterLatestResponse: Decodable {
     let date: String
+    let base: String
     let rates: [String: Double]
+
+    private struct DynamicKey: CodingKey {
+        var stringValue: String
+        init?(stringValue: String) { self.stringValue = stringValue }
+        var intValue: Int? { nil }
+        init?(intValue: Int) { return nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+
+        let dateKey = DynamicKey(stringValue: "date")!
+        date = try container.decode(String.self, forKey: dateKey)
+
+        guard let baseKey = container.allKeys.first(where: { $0.stringValue != "date" }) else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: container.codingPath,
+                      debugDescription: "Missing dynamic currency key")
+            )
+        }
+
+        base = baseKey.stringValue
+        rates = try container.decode([String: Double].self, forKey: baseKey)
+    }
 }
 
 struct CurrencyService {
@@ -18,7 +41,7 @@ struct CurrencyService {
     // --- 🚀 智能入口：获取汇率 ---
     // View 层只调用这个方法，不需要关心内部逻辑
     static func getRates(base: String = "CNY") async -> [String: Double] {
-        
+        print(base)
         // 1. 检查：今天是不是已经更新过了？并且基准币种一致？
         if
             let lastDate = UserDefaults.standard.object(forKey: kDateKey) as? Date,
@@ -49,7 +72,7 @@ struct CurrencyService {
     
     // --- 内部方法：联网下载 (私有) ---
     private static func fetchRemoteRates(base: String) async throws -> [String: Double] {
-        let urlString = "https://api.frankfurter.app/latest?from=\(base)"
+        let urlString = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/\(base.lowercased()).json"
         guard let url = URL(string: urlString) else { return [:] }
         
         let (data, _) = try await URLSession.shared.data(from: url)
@@ -75,30 +98,4 @@ struct CurrencyService {
         return try? JSONDecoder().decode([String: Double].self, from: data)
     }
     
-    static func fetchRate(from source: String, to target: String) async throws -> Double {
-            
-            // 如果币种相同，直接返回 1.0
-            if source == target { return 1.0 }
-            
-            // 构造 URL
-            // Frankfurter API: https://api.frankfurter.app/latest?from=USD&to=CNY
-            let urlString = "https://api.frankfurter.app/latest?from=\(source)&to=\(target)"
-            
-            guard let url = URL(string: urlString) else {
-                throw URLError(.badURL)
-            }
-            
-            // 发起网络请求
-            let (data, _) = try await URLSession.shared.data(from: url)
-            
-            // 解析 JSON
-            let response = try JSONDecoder().decode(FrankfurterLatestResponse.self, from: data)
-            
-            // 获取目标汇率
-            if let rate = response.rates[target] {
-                return rate
-            } else {
-                throw URLError(.cannotParseResponse)
-            }
-        }
 }

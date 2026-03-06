@@ -347,7 +347,11 @@ struct AddTransactionView: View {
                         else if currency.contains("USD") { self.location = .us }
                         else if currency.contains("HKD") { self.location = .hk }
                         else if currency.contains("JPY") { self.location = .jp }
-                        else { self.location = .other }
+                        else if currency.contains("TWD") {self.location = .tw}
+                        else if currency.contains("NZD") {self.location = .nz}
+                        else if currency.contains("EUR") {self.location = .other}
+                        else if currency.contains("GBP") {self.location = .uk}
+                        else if currency.contains("MOP") {self.location = .mo}
                     }
                 }
             }
@@ -520,25 +524,21 @@ struct AddTransactionView: View {
         let sourceCurrency = location.currencyCode
         let card = cards[selectedCardIndex]
         let targetCurrency = card.issueRegion.currencyCode
-        
-        if sourceCurrency == targetCurrency || sourceCurrency == "TWD" || sourceCurrency == "EUR" {
-            billingAmountStr = amount
-            return
-        }
+    
         guard transactionToEdit == nil else { return }
         if shouldSkipRateUpdate{
             return
         }
 
         Task {
-            do {
-                let rate = try await CurrencyService.fetchRate(from: sourceCurrency, to: targetCurrency)
+            let rates = await CurrencyService.getRates(base: sourceCurrency)
+            if let rate = rates[targetCurrency.lowercased()], rate > 0 {
                 let billing = amountDouble * rate
                 await MainActor.run {
                     self.billingAmountStr = String(format: "%.2f", billing)
                 }
-            } catch {
-                print("汇率获取失败: \(error)")
+            } else {
+                print("汇率获取失败: 缺少 \(sourceCurrency)->\(targetCurrency) 汇率")
             }
         }
     }

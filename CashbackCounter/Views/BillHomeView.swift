@@ -25,7 +25,7 @@ struct BillHomeView: View {
     // 3. 筛选状态
     @State private var selectedDate = Date()
     @State private var showAll = false
-    @State private var isWholeYear = false
+    @State private var isWholeYear = true
     @State private var selectedCategory: Category? = nil
     @State private var showIncomeOnly = false
     
