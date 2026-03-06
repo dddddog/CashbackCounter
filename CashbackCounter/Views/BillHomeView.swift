@@ -3,17 +3,20 @@ import SwiftData
 import UniformTypeIdentifiers // 确保引入以支持文件导入
 
 struct BillHomeView: View {
+    @State private var searchText = ""
+    @State private var isSearchPresented = false
+
+    var body: some View {
+        BillHomeContentView(searchText: $searchText, isSearchPresented: $isSearchPresented)
+    }
+}
+
+struct BillHomeContentView: View {
     // 1. 数据库上下文
     @Environment(\.modelContext) var context
     
     // 按日期倒序、商户名正序排列
-    @Query(
-        sort: [
-            SortDescriptor(\Transaction.date, order: .reverse),
-            SortDescriptor(\Transaction.merchant, order: .forward)
-        ]
-    )
-    var dbTransactions: [Transaction]
+    @Query private var dbTransactions: [Transaction]
     
     // 2. 弹窗状态
     @State private var selectedTransaction: Transaction? = nil
@@ -29,9 +32,9 @@ struct BillHomeView: View {
     @State private var selectedCategory: Category? = nil
     @State private var showIncomeOnly = false
     
-    // 👇 新增：搜索文本状态
-    @State private var searchText = ""
-    @State private var isSearchPresented = false
+    // 👇 搜索状态
+    @Binding private var searchText: String
+    @Binding private var isSearchPresented: Bool
 
     // 趋势图与导入状态
     @Query var cards: [CreditCard]
@@ -46,11 +49,35 @@ struct BillHomeView: View {
     @State private var exchangeRates: [String: Double] = [:]
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
     
+    init(searchText: Binding<String>, isSearchPresented: Binding<Bool>) {
+        let trimmed = searchText.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        _searchText = searchText
+        _isSearchPresented = isSearchPresented
+
+        if trimmed.isEmpty {
+            _dbTransactions = Query(
+                sort: [
+                    SortDescriptor(\Transaction.date, order: .reverse),
+                    SortDescriptor(\Transaction.merchant, order: .forward)
+                ]
+            )
+        } else {
+            _dbTransactions = Query(
+                filter: #Predicate<Transaction> { transaction in
+                    transaction.merchant.localizedStandardContains(trimmed)
+                },
+                sort: [
+                    SortDescriptor(\Transaction.date, order: .reverse),
+                    SortDescriptor(\Transaction.merchant, order: .forward)
+                ]
+            )
+        }
+    }
+
     // 5. 核心筛选逻辑 (不含支付方式)
     var filteredTransactions: [Transaction] {
-        let query = trimmedSearchText
         if isSearchingActive {
-            return dbTransactions.filter { matchesSearch($0, query: query) }
+            return dbTransactions
         }
 
         // 第一步：日期筛选
@@ -108,53 +135,6 @@ struct BillHomeView: View {
             return "总返现"
         }
         return isWholeYear ? "本年返现" : "本月返现"
-    }
-
-    private func matchesSearch(_ transaction: Transaction, query: String) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return true }
-
-        func contains(_ value: String) -> Bool {
-            value.localizedCaseInsensitiveContains(needle)
-        }
-
-        var candidates: [String] = [
-            transaction.merchant,
-            transaction.category.displayName,
-            transaction.location.currencyCode,
-            transaction.paymentMethod.displayName,
-            transaction.dateString,
-            String(format: "%.2f", transaction.amount),
-            String(format: "%.2f", transaction.billingAmount),
-            String(format: "%.2f", transaction.cashbackamount),
-            String(transaction.pointsEarned),
-            String(format: "%.2f", transaction.rate)
-        ]
-
-        if let card = transaction.card {
-            candidates.append(contentsOf: [
-                card.bankName,
-                card.type,
-                card.endNum,
-                card.issueRegion.rawValue,
-                card.issueRegion.currencyCode
-            ])
-        }
-
-        if let incomes = transaction.incomes, !incomes.isEmpty {
-            for income in incomes {
-                candidates.append(contentsOf: [
-                    income.detail,
-                    income.platform,
-                    income.location.rawValue,
-                    income.location.currencyCode,
-                    income.dateString,
-                    String(format: "%.2f", income.amount)
-                ])
-            }
-        }
-
-        return candidates.contains { contains($0) }
     }
 
     @ViewBuilder
@@ -342,7 +322,7 @@ struct BillHomeView: View {
             .navigationTitle("Cashback Counter")
             .navigationBarTitleDisplayMode(.inline)
             // 👇 新增：搜索框
-            .searchable(text: $searchText, isPresented: $isSearchPresented, placement: .automatic, prompt: "搜索全部信息")
+            .searchable(text: $searchText, isPresented: $isSearchPresented, placement: .automatic, prompt: "搜索商户")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
