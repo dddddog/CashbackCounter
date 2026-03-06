@@ -27,11 +27,8 @@ struct PointLibraryView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(point.displayName)
                                     .font(.headline)
-                                Text("价值: \(String(format: "%.6f", point.pointValue)) \(point.valueCurrencyCode) / 点")
+                                Text("价值: \(String(format: "%.6f", point.pointValue)) \(point.valueCurrencyCode.currencyCode) / 点")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("兑换比例: \(String(point.exchangeRate)) 积分 = 1 \(point.valueCurrencyCode)")
-                                    .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -77,8 +74,7 @@ struct PointEditorView: View {
     @State private var bankName: String
     @State private var pointName: String
     @State private var pointValueStr: String
-    @State private var exchangeRateStr: String
-    @State private var currencyCode: String
+    @State private var currencyRegion: Region
 
     init(pointToEdit: Point? = nil) {
         self.pointToEdit = pointToEdit
@@ -86,14 +82,12 @@ struct PointEditorView: View {
             _bankName = State(initialValue: point.bankName)
             _pointName = State(initialValue: point.pointName)
             _pointValueStr = State(initialValue: String(point.pointValue))
-            _exchangeRateStr = State(initialValue: String(point.exchangeRate))
-            _currencyCode = State(initialValue: point.valueCurrencyCode)
+            _currencyRegion = State(initialValue: point.valueCurrencyCode)
         } else {
             _bankName = State(initialValue: "")
             _pointName = State(initialValue: "")
             _pointValueStr = State(initialValue: "0.01")
-            _exchangeRateStr = State(initialValue: "100")
-            _currencyCode = State(initialValue: "CNY")
+            _currencyRegion = State(initialValue: .cn)
         }
     }
 
@@ -105,7 +99,7 @@ struct PointEditorView: View {
                     TextField("积分名称", text: $pointName)
                 }
 
-                Section(header: Text("价值与兑换")) {
+                Section(header: Text("价值与币种")) {
                     HStack {
                         Text("积分价值")
                         Spacer()
@@ -113,15 +107,12 @@ struct PointEditorView: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    HStack {
-                        Text("兑换比例")
-                        Spacer()
-                        TextField("100", text: $exchangeRateStr)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
+                    Picker("币种", selection: $currencyRegion) {
+                        ForEach(Region.allCases, id: \.self) { region in
+                            Text("\(region.icon) \(region.currencyCode)")
+                                .tag(region)
+                        }
                     }
-                    TextField("币种 (如: CNY)", text: $currencyCode)
-                        .textInputAutocapitalization(.characters)
                 }
             }
             .navigationTitle(pointToEdit == nil ? "新增积分计划" : "编辑积分计划")
@@ -132,7 +123,7 @@ struct PointEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { savePoint() }
-                        .disabled(bankName.isEmpty || pointName.isEmpty || currencyCode.isEmpty)
+                        .disabled(bankName.isEmpty || pointName.isEmpty)
                 }
             }
         }
@@ -140,22 +131,17 @@ struct PointEditorView: View {
 
     private func savePoint() {
         let pointValue = Double(pointValueStr) ?? 0
-        let exchangeRate = Int(exchangeRateStr) ?? 0
-        let currency = currencyCode.trimmingCharacters(in: .whitespacesAndNewlines)
-
         if let existing = pointToEdit {
             existing.bankName = bankName
             existing.pointName = pointName
             existing.pointValue = pointValue
-            existing.exchangeRate = exchangeRate
-            existing.valueCurrencyCode = currency
+            existing.valueCurrencyCode = currencyRegion
         } else {
             let newPoint = Point(
                 bankName: bankName,
                 pointName: pointName,
                 pointValue: pointValue,
-                exchangeRate: exchangeRate,
-                valueCurrencyCode: currency
+                valueCurrencyCode: currencyRegion
             )
             context.insert(newPoint)
         }

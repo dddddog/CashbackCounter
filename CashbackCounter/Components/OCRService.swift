@@ -86,6 +86,9 @@ struct OCRService {
         if upperText.contains("NZD") { return .nz }
         if upperText.contains("CNY") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
         if upperText.contains("USD") { return .us }
+        if upperText.contains("MOP") || upperText.contains("macau") { return .mo }
+        if upperText.contains("EUR") || upperText.contains("EURO") { return .other }
+        if upperText.contains("GBP") || upperText.contains("uk") || upperText.contains("£") { return .uk }
         
         // 2. 弱特征：看地名或特殊符号 (如果货币没找到)
         if upperText.contains("合計") || upperText.contains("料金") { return .jp }
@@ -108,10 +111,10 @@ struct OCRService {
         case .cn:
             // 简中区
             return ["zh-Hans", "en-US", "ja-JP"]
-        case .hk, .tw:
+        case .hk, .tw, .mo:
             // 繁中区
             return ["zh-Hant", "en-US", "ja-JP"]
-        case .us, .nz, .other:
+        case .us, .nz, .other, .uk:
             // 英语区
             return ["en-US", "zh-Hans", "ja-JP"]
         }

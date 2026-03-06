@@ -5,6 +5,7 @@ import SwiftData
 struct ContentView: View {
     // 选中的 Tab 索引
     @State private var selectedTab = 0
+    @Environment(\.modelContext) private var context
     
     var body: some View {
         // TabView 是底部导航栏的核心容器
@@ -35,11 +36,11 @@ struct ContentView: View {
                 }
                 .tag(2)
             
-            // --- 结单分析页 ---
-            StatementAnalysisEntryView()
+            // --- 积分系统页 ---
+            PointSystemView()
                 .tabItem {
-                    Image(systemName: selectedTab == 3 ? "chart.bar.doc.horizontal.fill" : "chart.bar.doc.horizontal")
-                    Text("结单")
+                    Image(systemName: selectedTab == 3 ? "star.circle.fill" : "star.circle")
+                    Text("积分")
                 }
                 .tag(3)
             
@@ -53,5 +54,12 @@ struct ContentView: View {
                 .tag(4)
         }
         .tint(.blue) // 设置底部选中时的颜色 (Apple 蓝)
+        .task {
+            do {
+                try Point.syncDefaultPoints(in: context)
+            } catch {
+                print("Failed to sync point templates: \(error)")
+            }
+        }
     }
 }

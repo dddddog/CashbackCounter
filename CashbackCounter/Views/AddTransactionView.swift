@@ -407,13 +407,13 @@ struct AddTransactionView: View {
     
     private func resolvePointValueInCardCurrency(for card: CreditCard) async -> Double {
         guard let pointProgram = card.pointProgram else { return 0 }
-        let pointCurrency = pointProgram.valueCurrencyCode
-        let cardCurrency = card.issueRegion.currencyCode
-        if pointCurrency == cardCurrency {
+        let pointRegion = pointProgram.valueCurrencyCode
+        let cardRegion = card.issueRegion
+        if pointRegion == cardRegion {
             return pointProgram.pointValue
         }
-        let rates = await CurrencyService.getRates(base: pointCurrency)
-        if let rate = rates[cardCurrency], rate > 0 {
+        let rates = await CurrencyService.getRates(base: pointRegion.currencyCode)
+        if let rate = rates[cardRegion.currencyCode], rate > 0 {
             return pointProgram.pointValue * rate
         }
         return pointProgram.pointValue

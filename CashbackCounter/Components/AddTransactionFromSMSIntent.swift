@@ -124,11 +124,11 @@ struct AddTransactionFromSMSIntent: AppIntent {
 
     private func resolvePointValueInCardCurrency(pointProgram: Point?, cardCurrency: String) async -> Double {
         guard let pointProgram else { return 0 }
-        let pointCurrency = pointProgram.valueCurrencyCode
-        if pointCurrency == cardCurrency {
+        let pointRegion = pointProgram.valueCurrencyCode
+        if pointRegion.currencyCode == cardCurrency {
             return pointProgram.pointValue
         }
-        let rates = await CurrencyService.getRates(base: pointCurrency)
+        let rates = await CurrencyService.getRates(base: pointRegion.currencyCode)
         if let rate = rates[cardCurrency], rate > 0 {
             return pointProgram.pointValue * rate
         }

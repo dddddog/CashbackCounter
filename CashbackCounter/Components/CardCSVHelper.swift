@@ -5,7 +5,7 @@ import SwiftData
 struct CardCSVHelper {
     
     // 👇 1. 修改表头：末尾增加两列
-    static let header = "银行名称,卡种名称,尾号,颜色1(Hex),颜色2(Hex),地区(Code),本币返现率(%),外币返现率(%),本币上限,外币上限,餐饮加成(%),超市加成(%),出行加成(%),数码加成(%),其他加成(%),餐饮上限,超市上限,出行上限,数码上限,其他上限,上限周期(monthly/yearly),还款日,支付方式加成(代码:rate),支付方式上限(代码:cap),奖励类型,积分名称,积分银行,积分价值,兑换比例,积分币种"
+    static let header = "银行名称,卡种名称,尾号,颜色1(Hex),颜色2(Hex),地区(Code),本币返现率(%),外币返现率(%),本币上限,外币上限,餐饮加成(%),超市加成(%),出行加成(%),数码加成(%),其他加成(%),餐饮上限,超市上限,出行上限,数码上限,其他上限,上限周期(monthly/yearly),还款日,支付方式加成(代码:rate),支付方式上限(代码:cap),奖励类型,积分名称,积分银行,积分价值,积分币种"
     
     // MARK: - 导出逻辑 (生成字符串)
     static func generateCSV(from cards: [CreditCard]) -> String {
@@ -66,10 +66,9 @@ struct CardCSVHelper {
             let pointName = card.pointProgram?.pointName ?? ""
             let pointBank = card.pointProgram?.bankName ?? ""
             let pointValue = card.pointProgram != nil ? String(format: "%.6f", card.pointProgram?.pointValue ?? 0) : ""
-            let pointExchange = card.pointProgram != nil ? String(card.pointProgram?.exchangeRate ?? 0) : ""
-            let pointCurrency = card.pointProgram?.valueCurrencyCode ?? ""
+            let pointCurrency = card.pointProgram?.valueCurrencyCode.currencyCode ?? ""
             
-            let row = "\(bank),\(type),\(endNum),\(c1),\(c2),\(region),\(defRate),\(forRate),\(locCap),\(forCap),\(diningRate),\(groceryRate),\(travelRate),\(digitalRate),\(otherRate),\(diningCap),\(groceryCap),\(travelCap),\(digitalCap),\(otherCap),\(capPeriodStr),\(rDay),\(pmRatesStr),\(pmCapsStr),\(rewardTypeStr),\(pointName),\(pointBank),\(pointValue),\(pointExchange),\(pointCurrency)\n"
+            let row = "\(bank),\(type),\(endNum),\(c1),\(c2),\(region),\(defRate),\(forRate),\(locCap),\(forCap),\(diningRate),\(groceryRate),\(travelRate),\(digitalRate),\(otherRate),\(diningCap),\(groceryCap),\(travelCap),\(digitalCap),\(otherCap),\(capPeriodStr),\(rDay),\(pmRatesStr),\(pmCapsStr),\(rewardTypeStr),\(pointName),\(pointBank),\(pointValue),\(pointCurrency)\n"
             csvString.append(row)
         }
         return csvString
@@ -82,6 +81,7 @@ struct CardCSVHelper {
         let templateMap = Dictionary(uniqueKeysWithValues: templates.map { ($0.templateKey, $0) })
         let points = try context.fetch(FetchDescriptor<Point>())
         var pointMap: [String: Point] = Dictionary(uniqueKeysWithValues: points.map { (pointKey(for: $0), $0) })
+
 
         for (index, row) in rows.enumerated() {
             if index == 0 || row.trimmingCharacters(in: .whitespaces).isEmpty { continue }
@@ -163,30 +163,29 @@ struct CardCSVHelper {
                 }
             }
             
-            if rewardType == .points, columns.count >= 30 {
+            if rewardType == .points, columns.count >= 29 {
                 let pointName = columns[25].trimmingCharacters(in: .whitespacesAndNewlines)
                 let pointBank = columns[26].trimmingCharacters(in: .whitespacesAndNewlines)
                 let pointValue = Double(columns[27]) ?? 0
-                let pointExchange = Int(columns[28]) ?? 0
-                let pointCurrency = columns[29].trimmingCharacters(in: .whitespacesAndNewlines)
+                let pointCurrencyIndex = columns.count > 29 ? 29 : 28
+                let pointCurrency = columns[pointCurrencyIndex].trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 if !pointName.isEmpty, !pointCurrency.isEmpty {
+                    let pointRegion = Self.region(from: pointCurrency)
                     let key = pointKey(
                         bankName: pointBank,
                         pointName: pointName,
-                        currencyCode: pointCurrency,
-                        pointValue: pointValue,
-                        exchangeRate: pointExchange
+                        currencyCode: pointRegion.currencyCode,
+                        pointValue: pointValue
                     )
                     if let existing = pointMap[key] {
                         pointProgram = existing
-                    } else if pointValue > 0, pointExchange > 0 {
+                    } else if pointValue > 0 {
                         let newPoint = Point(
                             bankName: pointBank,
                             pointName: pointName,
                             pointValue: pointValue,
-                            exchangeRate: pointExchange,
-                            valueCurrencyCode: pointCurrency
+                            valueCurrencyCode: pointRegion
                         )
                         context.insert(newPoint)
                         pointMap[key] = newPoint
@@ -256,21 +255,27 @@ struct CardCSVHelper {
         bankName: String,
         pointName: String,
         currencyCode: String,
-        pointValue: Double,
-        exchangeRate: Int
+        pointValue: Double
     ) -> String {
         let valueKey = String(format: "%.8f", pointValue)
-        return "\(bankName)|\(pointName)|\(currencyCode)|\(valueKey)|\(exchangeRate)"
+        return "\(bankName)|\(pointName)|\(currencyCode)|\(valueKey)"
     }
 
     private static func pointKey(for point: Point) -> String {
         pointKey(
             bankName: point.bankName,
             pointName: point.pointName,
-            currencyCode: point.valueCurrencyCode,
-            pointValue: point.pointValue,
-            exchangeRate: point.exchangeRate
+            currencyCode: point.valueCurrencyCode.currencyCode,
+            pointValue: point.pointValue
         )
+    }
+
+    private static func region(from currencyCode: String) -> Region {
+        let normalized = currencyCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if let match = Region.allCases.first(where: { $0.currencyCode.uppercased() == normalized }) {
+            return match
+        }
+        return .other
     }
 }
 

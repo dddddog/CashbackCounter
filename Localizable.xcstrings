@@ -147,6 +147,9 @@
         }
       }
     },
+    "%@ 积分" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -291,9 +294,6 @@
           }
         }
       }
-    },
-    "100" : {
-
     },
     "AI 分析中..." : {
       "localizations" : {
@@ -987,6 +987,7 @@
       }
     },
     "价值与兑换" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1007,6 +1008,9 @@
           }
         }
       }
+    },
+    "价值与币种" : {
+
     },
     "保存" : {
       "localizations" : {
@@ -1054,6 +1058,7 @@
       }
     },
     "兑换比例" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1076,6 +1081,7 @@
       }
     },
     "兑换比例: %@ 积分 = 1 %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1852,6 +1858,9 @@
         }
       }
     },
+    "导入结单" : {
+
+    },
     "导入结果" : {
       "localizations" : {
         "en" : {
@@ -2070,7 +2079,11 @@
         }
       }
     },
+    "币种" : {
+
+    },
     "币种 (如: CNY)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2161,6 +2174,9 @@
           }
         }
       }
+    },
+    "当前积分" : {
+
     },
     "总%@趋势" : {
       "localizations" : {
@@ -2502,6 +2518,9 @@
         }
       }
     },
+    "新增积分返现交易后，这里会显示累计积分" : {
+
+    },
     "无" : {
       "localizations" : {
         "en" : {
@@ -2653,6 +2672,9 @@
           }
         }
       }
+    },
+    "暂无积分记录" : {
+
     },
     "暂无账单" : {
       "localizations" : {
@@ -3372,7 +3394,6 @@
       }
     },
     "积分" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3550,6 +3571,12 @@
         }
       }
     },
+    "积分明细" : {
+
+    },
+    "积分系统" : {
+
+    },
     "简体中文" : {
       "localizations" : {
         "en" : {
@@ -3617,6 +3644,7 @@
       }
     },
     "结单" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

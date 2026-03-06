@@ -39,6 +39,7 @@ struct BillHomeView: View {
     @State private var showFileImporter = false
     @State private var showImportAlert = false
     @State private var importMessage = ""
+    @State private var showStatementAnalysis = false
 
     // 4. 汇率表
     @State private var exchangeRates: [String: Double] = [:]
@@ -113,7 +114,7 @@ struct BillHomeView: View {
             return total + (cb / rate)
         }
     }
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -266,8 +267,8 @@ struct BillHomeView: View {
                         Button { showFileImporter = true } label: {
                             Label("导入账单", systemImage: "square.and.arrow.down")
                         }
-                        Button { showStatementImporter = true } label: {
-                            Label("导入结单", systemImage: "square.and.arrow.down")
+                        Button { showStatementAnalysis = true } label: {
+                            Label("导入结单", systemImage: "chart.bar.doc.horizontal.fill")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle").font(.system(size: 18))
@@ -337,6 +338,9 @@ struct BillHomeView: View {
                 TrendAnalysisView(transactions: dbTransactions, cards: cards, exchangeRates: exchangeRates, type: .expense)
                     .presentationDetents([.large, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showStatementAnalysis) {
+                StatementAnalysisEntryView()
             }
         }
         .task {
