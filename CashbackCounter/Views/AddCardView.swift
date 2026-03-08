@@ -182,8 +182,8 @@ struct AddCardView: View {
             
             _paymentMethodRates = State(initialValue: template.paymentMethodRates)
             _paymentCaps = State(initialValue: template.paymentCaps)
-            _rewardType = State(initialValue: .cashback)
-            _selectedPointID = State(initialValue: nil)
+            _rewardType = State(initialValue: template.rewardType)
+            _selectedPointID = State(initialValue: template.pointProgram?.id)
             
             
         }

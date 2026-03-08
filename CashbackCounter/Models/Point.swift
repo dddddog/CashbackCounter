@@ -53,11 +53,10 @@ struct PointSeed {
 
 extension Point {
     static let defaultSeeds: [PointSeed] = [
-        PointSeed(bankName: "HSBC", pointName: "RC", pointValue: 1.25, valueCurrencyCode: .hk),
-        PointSeed(bankName: "HSBC US", pointName: "Point", pointValue: 1.0, valueCurrencyCode: .us),
-        PointSeed(bankName: "ICBC ASIA", pointName: "Point", pointValue: 0.01, valueCurrencyCode: .hk),
-        PointSeed(bankName: "AMEX HK", pointName: "MR", pointValue: 0.01, valueCurrencyCode: .hk),
-        PointSeed(bankName: "Generic", pointName: "Standard Points (JPY)", pointValue: 0.01, valueCurrencyCode: .jp)
+        PointSeed(bankName: "HSBC HK", pointName: "RC", pointValue: 1.25, valueCurrencyCode: .hk),
+        PointSeed(bankName: "HSBC US", pointName: "Point", pointValue: 0.014, valueCurrencyCode: .us),
+        PointSeed(bankName: "AMEX HK", pointName: "MR", pointValue: 0.0056, valueCurrencyCode: .hk),
+        PointSeed(bankName: "AMEX US", pointName: "MR", pointValue: 0.016, valueCurrencyCode: .us)
     ]
 
     static func syncDefaultPoints(in context: ModelContext) throws {

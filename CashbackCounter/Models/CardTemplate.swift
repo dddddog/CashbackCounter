@@ -27,7 +27,10 @@ final class CardTemplate: Identifiable {
     
     // 👇 新增：支付方式加成 (存储百分比，如 1.0 代表 Apple Pay +1%)
     var paymentMethodRates: [PaymentMethod: Double]
-    
+
+    var rewardType: RewardType
+    var pointProgram: Point?
+
     var defaultRate: Double
     var foreignCurrencyRate: Double?
     
@@ -52,7 +55,10 @@ final class CardTemplate: Identifiable {
         
         // 👇 应用支付方式加成 (转换百分比)
         card.paymentMethodRates = Dictionary(uniqueKeysWithValues: paymentMethodRates.map { ($0.key, $0.value / 100.0) })
-        
+
+        card.rewardType = rewardType
+        card.pointProgram = pointProgram
+
         card.defaultRate = defaultRate / 100.0
         card.foreignCurrencyRate = foreignCurrencyRate.map { $0 / 100.0 }
         
@@ -90,6 +96,8 @@ final class CardTemplate: Identifiable {
         specialRate: [Category: Double],
         // 新增参数
         paymentMethodRates: [PaymentMethod: Double] = [:],
+        rewardType: RewardType = .cashback,
+        pointProgram: Point? = nil,
         defaultRate: Double,
         foreignCurrencyRate: Double?,
         localBaseCap: Double = 0,
@@ -107,6 +115,8 @@ final class CardTemplate: Identifiable {
         self.region = region
         self.specialRate = specialRate
         self.paymentMethodRates = paymentMethodRates // 赋值
+        self.rewardType = rewardType
+        self.pointProgram = pointProgram
         self.defaultRate = defaultRate
         self.foreignCurrencyRate = foreignCurrencyRate
         self.localBaseCap = localBaseCap
@@ -127,7 +137,11 @@ struct CardTemplateSeed {
     let specialRate: [Category: Double]
     // 👇 新增
     var paymentMethodRates: [PaymentMethod: Double] = [:]
-    
+
+    var rewardType: RewardType = .cashback
+    var pointProgram: Point? = nil
+    var pointProgramKey: String? = nil
+
     let defaultRate: Double
     let foreignCurrencyRate: Double?
     var localBaseCap: Double = 0
@@ -141,7 +155,7 @@ struct CardTemplateSeed {
     var templateKey: String { CardTemplate.templateKey(bankName: bankName, type: type) }
     var pictureURL: String? = nil
 
-    func makeModel() -> CardTemplate {
+    func makeModel(pointProgram: Point?) -> CardTemplate {
         CardTemplate(
             templateKey: templateKey,
             bankName: bankName,
@@ -150,6 +164,8 @@ struct CardTemplateSeed {
             region: region,
             specialRate: specialRate,
             paymentMethodRates: paymentMethodRates, // 传参
+            rewardType: rewardType,
+            pointProgram: pointProgram ?? self.pointProgram,
             defaultRate: defaultRate,
             foreignCurrencyRate: foreignCurrencyRate,
             localBaseCap: localBaseCap,
@@ -161,7 +177,7 @@ struct CardTemplateSeed {
         )
     }
 
-    func apply(to template: CardTemplate) {
+    func apply(to template: CardTemplate, pointProgram: Point?) {
         template.templateKey = templateKey
         template.bankName = bankName
         template.type = type
@@ -169,6 +185,8 @@ struct CardTemplateSeed {
         template.region = region
         template.specialRate = specialRate
         template.paymentMethodRates = paymentMethodRates // 同步
+        template.rewardType = rewardType
+        template.pointProgram = pointProgram ?? self.pointProgram
         template.defaultRate = defaultRate
         template.foreignCurrencyRate = foreignCurrencyRate
         template.localBaseCap = localBaseCap
@@ -178,22 +196,37 @@ struct CardTemplateSeed {
         template.capPeriod = capPeriod
         template.pictureURL = pictureURL
     }
+
+    func resolvedPointProgram(from pointMap: [String: Point]) -> Point? {
+        if let pointProgramKey {
+            return pointMap[pointProgramKey]
+        }
+        return pointProgram
+    }
+
+    static func pointTemplateKey(bankName: String, pointName: String, currencyCode: Region) -> String {
+        let parts = [bankName, pointName, currencyCode.currencyCode]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        return parts.joined(separator: "|")
+    }
 }
 
 extension CardTemplate {
     // 提示：如果你有通过 Apple Pay 返现更高的卡，可以在这里配置
     // 例如: paymentMethodRates: [.applePay: 1.0]
     
+    // 若要复用“积分库”里的 Point，可传入 pointProgramKey:
+    // pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC US", pointName: "Point", currencyCode: .us)
     static let defaultSeeds: [CardTemplateSeed] = [
-        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], defaultRate: 1.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 300],capPeriod: .monthly, pictureURL: "hsbchkred"),
-        CardTemplateSeed(bankName: "滙豐香港", type: "Pulse銀聯信用卡 ", colors: ["DB0011", "1A1A1A"], region: .cn, specialRate: [ .dining: 5 ], paymentMethodRates: [.pulse: 2.0], defaultRate: 2.4, foreignCurrencyRate: 2.4, localBaseCap: 2400, foreignBaseCap: 2400, categoryCaps: [.dining: 500], paymentCaps: [.pulse: 1600], capPeriod: .yearly, pictureURL: "hsbchkpulse"),
-        CardTemplateSeed(bankName: "滙豐香港", type: "卓越理財信用卡", colors: ["111111", "D9D9D9"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 2.4, foreignBaseCap: 2400, capPeriod: .yearly),
-        CardTemplateSeed(bankName: "滙豐香港", type: "Visa Signature卡", colors: ["1C1C1C", "757575"], region: .hk, specialRate: [ : ], defaultRate: 1.6, foreignCurrencyRate: 3.6, foreignBaseCap: 3600, capPeriod: .yearly, pictureURL: "hsbcvs"),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Red信用卡", colors: ["DA291C", "005863"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online: 3.0], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC HK", pointName: "RC", currencyCode: .hk), defaultRate: 1.0, foreignCurrencyRate: 1.0, localBaseCap: 0, foreignBaseCap: 0, categoryCaps: [: ], paymentCaps: [.online: 300],capPeriod: .monthly, pictureURL: "hsbchkred"),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Pulse銀聯信用卡 ", colors: ["DB0011", "1A1A1A"], region: .cn, specialRate: [ .dining: 5 ], paymentMethodRates: [.pulse: 2.0], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC HK", pointName: "RC", currencyCode: .hk), defaultRate: 2.4, foreignCurrencyRate: 2.4, localBaseCap: 2400, foreignBaseCap: 2400, categoryCaps: [.dining: 500], paymentCaps: [.pulse: 1600], capPeriod: .yearly, pictureURL: "hsbchkpulse"),
+        CardTemplateSeed(bankName: "滙豐香港", type: "卓越理財信用卡", colors: ["111111", "D9D9D9"], region: .hk, specialRate: [ : ], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC HK", pointName: "RC", currencyCode: .hk), defaultRate: 0.4, foreignCurrencyRate: 2.4, foreignBaseCap: 2400, capPeriod: .yearly),
+        CardTemplateSeed(bankName: "滙豐香港", type: "Visa Signature卡", colors: ["1C1C1C", "757575"], region: .hk, specialRate: [ : ], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC HK", pointName: "RC", currencyCode: .hk), defaultRate: 1.6, foreignCurrencyRate: 3.6, foreignBaseCap: 3600, capPeriod: .yearly, pictureURL: "hsbcvs"),
         CardTemplateSeed(bankName: "滙豐香港", type: "萬事達卡扣賬卡", colors: ["1D5564", "85BDCD"], region: .hk, specialRate: [ : ], defaultRate: 0.4, foreignCurrencyRate: 0.4, pictureURL: "hsbchkdebit"),
-        CardTemplateSeed(bankName: "AMEX HK", type: "Explorer", colors: ["0C1C26", "4B6E7D"], region: .hk, specialRate: [ : ], defaultRate: 1.6, foreignCurrencyRate: 5.9, pictureURL: "amexhkexplorer"),
+        CardTemplateSeed(bankName: "AMEX HK", type: "Explorer", colors: ["0C1C26", "4B6E7D"], region: .hk, specialRate: [ : ], paymentMethodRates: [.online : 200], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "AMEX HK", pointName: "MR", currencyCode: .hk), defaultRate: 300, foreignCurrencyRate: 1075, pictureURL: "amexhkexplorer"),
         CardTemplateSeed(bankName: "AMEX HK", type: "Blue Cash", colors: ["0C1C26", "4B6E7D"], region: .hk, specialRate: [ : ], defaultRate: 1.2, foreignCurrencyRate: 1.2, pictureURL: "amexhkbluecash"),
-        CardTemplateSeed(bankName: "HSBC US", type: "Elite", colors: ["050505", "050505"], region: .us, specialRate: [ .travel: 5.28,.dining:1.32], defaultRate: 1.32, foreignCurrencyRate: 1.32, pictureURL: "hsbcuselite"),
-        CardTemplateSeed(bankName: "HSBC US", type: "Premier", colors: ["24133F", "D92344"], region: .us, specialRate: [ .travel: 1.32,.grocery:2.64], defaultRate: 1.32, foreignCurrencyRate: 1.32, pictureURL: "hsbcuspremiercard"),
+        CardTemplateSeed(bankName: "HSBC US", type: "Elite", colors: ["050505", "050505"], region: .us, specialRate: [ .travel: 400,.dining:100], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC US", pointName: "Point", currencyCode: .us), defaultRate: 100, foreignCurrencyRate: 100, pictureURL: "hsbcuselite"),
+        CardTemplateSeed(bankName: "HSBC US", type: "Premier", colors: ["24133F", "D92344"], region: .us, specialRate: [ .travel: 100,.grocery:200], rewardType: .points, pointProgramKey: CardTemplateSeed.pointTemplateKey(bankName: "HSBC US", pointName: "Point", currencyCode: .us), defaultRate: 100, foreignCurrencyRate: 100, pictureURL: "hsbcuspremiercard"),
         CardTemplateSeed(bankName: "Ready", type: "Metal", colors: ["BD9850", "F2E9D4"], region: .us, specialRate: [:], defaultRate: 3, foreignCurrencyRate: 3, pictureURL: "ready"),
         CardTemplateSeed(bankName: "工銀亞洲", type: "Visa Signature", colors: ["121212", "EDC457"], region: .hk, specialRate: [ : ], defaultRate: 1.5, foreignCurrencyRate: 1.5, categoryCaps: [: ], pictureURL: "icbcasiavs"),
         CardTemplateSeed(bankName: "工銀亞洲", type: "粵港澳灣區信用卡", colors: ["0F0F0F", "C0C0C0"], region: .cn, specialRate: [ : ], paymentMethodRates: [.qrCode : 5, .offline : 5], defaultRate: 1.5, foreignCurrencyRate: 1.5, categoryCaps: [: ], paymentCaps: [.qrCode: 200, .offline : 200], capPeriod: .monthly, pictureURL: "icbcasiagba"),
@@ -210,11 +243,18 @@ extension CardTemplate {
         let currentTemplates = try context.fetch(descriptor)
         let currentMap = Dictionary(uniqueKeysWithValues: currentTemplates.map { ($0.templateKey, $0) })
 
+        let pointDescriptor = FetchDescriptor<Point>()
+        let currentPoints = try context.fetch(pointDescriptor)
+        let pointMap = Dictionary(uniqueKeysWithValues: currentPoints.map {
+            (CardTemplateSeed.pointTemplateKey(bankName: $0.bankName, pointName: $0.pointName, currencyCode: $0.valueCurrencyCode), $0)
+        })
+
         for seed in defaultSeeds {
+            let resolvedPointProgram = seed.resolvedPointProgram(from: pointMap)
             if let existing = currentMap[seed.templateKey] {
-                seed.apply(to: existing)
+                seed.apply(to: existing, pointProgram: resolvedPointProgram)
             } else {
-                context.insert(seed.makeModel())
+                context.insert(seed.makeModel(pointProgram: resolvedPointProgram))
             }
         }
     }
