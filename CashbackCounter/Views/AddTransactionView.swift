@@ -29,7 +29,6 @@ struct AddTransactionView: View {
     
     // AI 分析状态
     @State private var isAnalyzing: Bool = false
-    @EnvironmentObject private var aiAvailability: AppleIntelligenceAvailability
     @State private var showFullImage = false
     @State private var showImagePicker: Bool = false
 
@@ -155,11 +154,6 @@ struct AddTransactionView: View {
                     }
                 }
 
-                if !aiAvailability.isSupported {
-                    Section {
-                        Label("Apple Intelligence 当前不可用，已切换为手动填写模式。", systemImage: "info.circle")
-                    }
-                }
                 
                 // --- 第二组：收据凭证 ---
                 Section(header: Text("收据凭证")) {

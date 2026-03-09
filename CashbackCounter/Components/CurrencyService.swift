@@ -31,6 +31,11 @@ struct FrankfurterLatestResponse: Decodable {
     }
 }
 
+struct CachedRates: Codable {
+    let base: String
+    let rates: [String: Double]
+}
+
 struct CurrencyService {
 
     // --- 缓存配置 ---
@@ -52,7 +57,7 @@ struct CurrencyService {
             // 如果最后更新时间是“今天”，并且基准币种一致，直接读缓存
             if let cachedRates = loadLocalRates() {
                 print("✅ 汇率无需更新，使用本地缓存 (\(base))")
-                return cachedRates
+                return cachedRates.rates
             }
         }
 
@@ -83,8 +88,9 @@ struct CurrencyService {
 
     // --- 内部方法：存入 UserDefaults ---
     private static func saveRatesLocally(_ rates: [String: Double], base: String) {
-        // 1. 存汇率 (字典自动转 Data)
-        if let data = try? JSONEncoder().encode(rates) {
+        // 1. 存汇率 + 基准币种
+        let cached = CachedRates(base: base, rates: rates)
+        if let data = try? JSONEncoder().encode(cached) {
             UserDefaults.standard.set(data, forKey: kRatesKey)
         }
         // 2. 存时间 (存当前时间)
@@ -96,7 +102,15 @@ struct CurrencyService {
     // --- 内部方法：读取 UserDefaults ---
     private static func loadLocalRates() -> CachedRates? {
         guard let data = UserDefaults.standard.data(forKey: kRatesKey) else { return nil }
-        return try? JSONDecoder().decode(CachedRates.self, from: data)
+        if let cached = try? JSONDecoder().decode(CachedRates.self, from: data) {
+            return cached
+        }
+        // 兼容旧版本缓存（仅存汇率字典）
+        if let rates = try? JSONDecoder().decode([String: Double].self, from: data),
+           let base = UserDefaults.standard.string(forKey: kBaseKey) {
+            return CachedRates(base: base, rates: rates)
+        }
+        return nil
     }
     
 }
