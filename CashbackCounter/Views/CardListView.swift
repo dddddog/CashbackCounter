@@ -30,7 +30,6 @@ struct CardListView: View {
     @State private var showFileImporter = false
     @State private var importError: String?
     @State private var showImportAlert = false
-    @State private var showPointLibrary = false
     // 核心状态：当前展开的卡片 ID
     @State private var selectedCardID: PersistentIdentifier? = nil
     
@@ -200,7 +199,6 @@ struct CardListView: View {
                             
                             Divider()
                             
-                            Button(action: { showPointLibrary = true }) { Label("积分库", systemImage: "star.circle") }
                             
                             if !cards.isEmpty,
                                let csvURL = cards.exportCSVFile() {
@@ -237,9 +235,6 @@ struct CardListView: View {
             }
             .sheet(item: $cardToEdit) { card in
                 AddCardView(cardToEdit: card)
-            }
-            .sheet(isPresented: $showPointLibrary) {
-                PointLibraryView()
             }
             // 👇 处理导入
             .fileImporter(

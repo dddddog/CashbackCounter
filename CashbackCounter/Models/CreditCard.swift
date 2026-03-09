@@ -271,12 +271,12 @@ class CreditCard: Identifiable {
             baseRate = fr
         }
         
-        let potentialBasePoints = (amount * baseRate) / pointValueInCardCurrency
+        let potentialBasePoints = (amount * baseRate)
         let categoryBonusRate = specialRates[category] ?? 0.0
         let paymentBonusRate = paymentMethodRates[paymentMethod] ?? 0.0
         
-        let potentialCategoryPoints = (amount * categoryBonusRate) / pointValueInCardCurrency
-        let potentialPaymentPoints = (amount * paymentBonusRate) / pointValueInCardCurrency
+        let potentialCategoryPoints = (amount * categoryBonusRate)
+        let potentialPaymentPoints = (amount * paymentBonusRate)
         
         let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
         let categoryCapLimit = categoryCaps[category] ?? 0.0
@@ -308,7 +308,7 @@ class CreditCard: Identifiable {
                 .filter { ($0.location != self.issueRegion) == isForeign }
                 .reduce(0) { sum, t in
                     let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
-                    return sum + (t.billingAmount * tBaseRate / pointValueInCardCurrency)
+                    return sum + (t.billingAmount * tBaseRate)
                 }
         }
         
@@ -318,7 +318,7 @@ class CreditCard: Identifiable {
                 .filter { $0.category == category }
                 .reduce(0) { sum, t in
                     let tBonusRate = specialRates[t.category] ?? 0.0
-                    return sum + (t.billingAmount * tBonusRate / pointValueInCardCurrency)
+                    return sum + (t.billingAmount * tBonusRate)
                 }
         }
         
@@ -328,7 +328,7 @@ class CreditCard: Identifiable {
                 .filter { $0.paymentMethod == paymentMethod }
                 .reduce(0) { sum, t in
                     let tBonusRate = paymentMethodRates[t.paymentMethod] ?? 0.0
-                    return sum + (t.billingAmount * tBonusRate / pointValueInCardCurrency)
+                    return sum + (t.billingAmount * tBonusRate)
                 }
         }
         

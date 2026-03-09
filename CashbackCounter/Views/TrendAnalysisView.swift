@@ -42,6 +42,28 @@ struct TrendAnalysisView: View {
     let type: TrendType
     
     @State private var selectedCard: CreditCard? = nil
+
+    private func exchangeRate(for currencyCode: String) -> Double {
+        if currencyCode == mainCurrencyCode { return 1.0 }
+        if let rate = exchangeRates[currencyCode] { return rate }
+        if let rate = exchangeRates[currencyCode.uppercased()] { return rate }
+        if let rate = exchangeRates[currencyCode.lowercased()] { return rate }
+        return 1.0
+    }
+
+    private func billingCurrencyCode(for transaction: Transaction) -> String {
+        guard let card = transaction.card else {
+            return transaction.location.currencyCode
+        }
+
+        // Legacy import: billingAmount was saved in transaction currency (no FX conversion).
+        if transaction.location != card.issueRegion,
+           abs(transaction.billingAmount - transaction.amount) < 0.0001 {
+            return transaction.location.currencyCode
+        }
+
+        return card.issueRegion.currencyCode
+    }
     
     // 计算图表数据
     var chartData: [MonthlyData] {
@@ -64,16 +86,18 @@ struct TrendAnalysisView: View {
                 // 计算总额 (根据类型区分逻辑)
                 let total = monthlyTransactions.reduce(0) { sum, t in
                     let amountToAdd: Double
+                    let currencyCode: String
                     // 👇 分支逻辑
                     if type == .expense {
                         amountToAdd = t.billingAmount // 支出算入账金额
+                        currencyCode = billingCurrencyCode(for: t)
                     } else {
                         amountToAdd = CashbackService.calculateCashback(for: t) // 返现算返现额
+                        currencyCode = t.card?.issueRegion.currencyCode ?? mainCurrencyCode
                     }
                     
                     // 汇率换算
-                    let code = t.card?.issueRegion.currencyCode ?? "CNY"
-                    let rate = exchangeRates[code] ?? 1.0
+                    let rate = exchangeRate(for: currencyCode)
                     return sum + (amountToAdd / rate)
                 }
                 

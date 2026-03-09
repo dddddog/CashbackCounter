@@ -524,7 +524,13 @@ struct AddTransactionView: View {
         let sourceCurrency = location.currencyCode
         let card = cards[selectedCardIndex]
         let targetCurrency = card.issueRegion.currencyCode
-    
+
+        if sourceCurrency == targetCurrency {
+            // Same-currency transactions should always mirror the entered amount.
+            billingAmountStr = String(format: "%.2f", amountDouble)
+            return
+        }
+
         guard transactionToEdit == nil else { return }
         if shouldSkipRateUpdate{
             return

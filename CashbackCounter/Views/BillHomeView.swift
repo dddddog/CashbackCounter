@@ -44,6 +44,7 @@ struct BillHomeContentView: View {
     @State private var showImportAlert = false
     @State private var importMessage = ""
     @State private var showStatementAnalysis = false
+    @State private var didLogNegativeExpenses = false
 
     // 4. 汇率表
     @State private var exchangeRates: [String: Double] = [:]
@@ -270,22 +271,77 @@ struct BillHomeContentView: View {
         }
         .padding(.horizontal)
     }
+
+    private func exchangeRate(for currencyCode: String) -> Double {
+        if currencyCode == mainCurrencyCode { return 1.0 }
+        if let rate = exchangeRates[currencyCode] { return rate }
+        if let rate = exchangeRates[currencyCode.uppercased()] { return rate }
+        if let rate = exchangeRates[currencyCode.lowercased()] { return rate }
+        return 1.0
+    }
+
+    private func billingCurrencyCode(for transaction: Transaction) -> String {
+        guard let card = transaction.card else {
+            return transaction.location.currencyCode
+        }
+
+        // Legacy import: billingAmount was saved in transaction currency (no FX conversion).
+        if transaction.location != card.issueRegion,
+           abs(transaction.billingAmount - transaction.amount) < 0.0001 {
+            return transaction.location.currencyCode
+        }
+
+        return card.issueRegion.currencyCode
+    }
+
+    private func expenseInMainCurrency(for transaction: Transaction) -> (amount: Double, currencyCode: String) {
+        let code = billingCurrencyCode(for: transaction)
+        let rate = exchangeRate(for: code)
+        return (transaction.billingAmount / rate, code)
+    }
+
+    private func incomeInMainCurrency(for transaction: Transaction) -> Double {
+        (transaction.incomes ?? []).reduce(0) { partial, income in
+            let incomeRate = exchangeRate(for: income.location.currencyCode)
+            return partial + (income.amount / incomeRate)
+        }
+    }
+
+    private func logNegativeExpenseTransactions() {
+        guard !didLogNegativeExpenses, !exchangeRates.isEmpty else { return }
+        didLogNegativeExpenses = true
+
+        let negativeItems = filteredTransactions.compactMap { transaction -> (Transaction, Double, Double, Double, String)? in
+            let expenseInfo = expenseInMainCurrency(for: transaction)
+            let income = incomeInMainCurrency(for: transaction)
+            let net = expenseInfo.amount - income
+            guard net < -0.0001 else { return nil }
+            return (transaction, net, expenseInfo.amount, income, expenseInfo.currencyCode)
+        }
+
+        if negativeItems.isEmpty {
+            print("NEG_EXPENSE_CHECK: no negative net expenses in current filter.")
+            return
+        }
+
+        print("NEG_EXPENSE_CHECK: found \(negativeItems.count) negative net expense transactions.")
+        for (transaction, net, expenseMain, incomeMain, billingCode) in negativeItems {
+            let cardName = transaction.card.map { "\($0.bankName) \($0.type)" } ?? "无卡"
+            let issueCode = transaction.card?.issueRegion.currencyCode ?? "-"
+            let incomeCount = transaction.incomes?.count ?? 0
+            print("""
+NEG_EXPENSE | merchant=\(transaction.merchant) | date=\(transaction.dateString) | card=\(cardName) | issue=\(issueCode) | location=\(transaction.location.currencyCode) | amount=\(transaction.amount) | billing=\(transaction.billingAmount) \(billingCode) | expenseMain=\(expenseMain) | incomeMain=\(incomeMain) | netMain=\(net) | incomes=\(incomeCount)
+""")
+        }
+    }
     
     // 计算总支出
     var totalExpense: Double {
         if exchangeRates.isEmpty { return 0.0 }
         return filteredTransactions.reduce(0) { total, t in
-            let code = t.card?.issueRegion.currencyCode ?? "CNY"
-            let rate = exchangeRates[code] ?? 1.0
-
-            let expenseInMain = t.billingAmount / rate
-            let incomeInMain = (t.incomes ?? []).reduce(0) { partial, income in
-                let incomeCode = income.location.currencyCode
-                let incomeRate = exchangeRates[incomeCode] ?? 1.0
-                return partial + (income.amount / incomeRate)
-            }
-
-            return total + (expenseInMain - incomeInMain)
+            let expenseInfo = expenseInMainCurrency(for: t)
+            let incomeInMain = incomeInMainCurrency(for: t)
+            return total + (expenseInfo.amount - incomeInMain)
         }
     }
     
@@ -294,8 +350,8 @@ struct BillHomeContentView: View {
         if exchangeRates.isEmpty { return 0.0 }
         return filteredTransactions.reduce(0) { total, t in
             let cb = CashbackService.calculateCashback(for: t)
-            let code = t.card?.issueRegion.currencyCode ?? "CNY"
-            let rate = exchangeRates[code] ?? 1.0
+            let code = t.card?.issueRegion.currencyCode ?? mainCurrencyCode
+            let rate = exchangeRate(for: code)
             return total + (cb / rate)
         }
     }
@@ -416,14 +472,20 @@ struct BillHomeContentView: View {
         .task {
             do {
                 let rates = await CurrencyService.getRates(base: mainCurrencyCode)
-                await MainActor.run { self.exchangeRates = rates }
+                await MainActor.run {
+                    self.exchangeRates = rates
+                    logNegativeExpenseTransactions()
+                }
             }
         }
         .onChange(of: mainCurrencyCode) { _, newCode in
             Task {
                 do {
                     let rates = await CurrencyService.getRates(base: newCode)
-                    await MainActor.run { self.exchangeRates = rates }
+                    await MainActor.run {
+                        self.exchangeRates = rates
+                        logNegativeExpenseTransactions()
+                    }
                 }
             }
         }

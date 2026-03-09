@@ -115,9 +115,6 @@ struct SettingsView: View {
                 
                 // Data Management Section
                 Section(header: Text("数据管理")) {
-                    Label("iCloud 同步 (功能正在开发中)", systemImage: "icloud")
-                        .foregroundColor(.secondary)
-                    
                     Button {
                         startExportProcess()
                     } label: {
@@ -136,6 +133,10 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(isExporting) // 导出过程中禁止重复点击
+
+                    NavigationLink(destination: PrivacyPolicyView()) {
+                        Label("隐私政策", systemImage: "hand.raised")
+                    }
                 }
                 
                 // About Section
@@ -149,6 +150,12 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: DeveloperView()) {
                         Label("开发者/贡献者", systemImage: "person.crop.circle")
+                    }
+                }
+
+                Section(header: Text("更新说明")) {
+                    NavigationLink(destination: UpdateNotesView(appVersion: appVersion)) {
+                        Label("更新版本注意事项", systemImage: "exclamationmark.triangle")
                     }
                 }
                 
@@ -243,6 +250,60 @@ struct SettingsView: View {
         for item in items {
             context.delete(item)
         }
+    }
+}
+
+private struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("隐私政策")
+                    .font(.title2.weight(.semibold))
+                    .padding(.bottom, 4)
+
+                Text("我们重视你的隐私。以下为应用当前版本的隐私说明：")
+                    .foregroundColor(.secondary)
+
+                Text("• 数据存储：账单、卡片、积分等数据全部保存在你的设备本地，我们不上传任何个人数据。")
+                Text("• 网络请求：应用可能会为获取汇率、下载卡面等功能访问网络，仅下载必要参数。")
+                Text("• 权限使用：相机、相册、通知等权限仅在对应功能使用时申请，可在系统设置中随时关闭。")
+                Text("• 分享导出：仅当你主动使用“导出”功能时，数据才会通过系统导出面板离开应用。")
+
+                Text("若你对隐私相关内容有疑问，请联系开发者。")
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle("隐私政策")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct UpdateNotesView: View {
+    let appVersion: String
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("更新版本注意事项")
+                    .font(.title2.weight(.semibold))
+                    .padding(.bottom, 4)
+
+                Text("当前版本：v\(appVersion)")
+                    .foregroundColor(.secondary)
+
+                Text("• 更新前建议使用“全部数据导出”进行备份！！！（重要）。")
+                Text("• 更新后首次打开可能需要短暂时间完成数据整理。")
+                Text("• 若更新后出现应用闪退或异常的情况请删除应用，重新下载并导入之前备份的数据")
+                Text("• 若问题仍存在，请联系开发者协助排查。")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle("更新注意事项")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

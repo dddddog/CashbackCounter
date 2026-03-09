@@ -87,6 +87,9 @@ struct DeveloperView: View {
                     Link(destination: URL(string: "https://github.com/HarukaKinen/Cardentify")!) {
                         Label("调用卡面库 Cardentify", systemImage: "shippingbox")
                     }
+                    Link(destination: URL(string: "https://github.com/fawazahmed0/exchange-api")!) {
+                        Label("调用货币费率数据库 exchange-api", systemImage: "shippingbox")
+                    }
                 }
             }
             .listStyle(.insetGrouped)
