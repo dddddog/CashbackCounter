@@ -32,7 +32,7 @@ struct FrankfurterLatestResponse: Decodable {
 }
 
 struct CurrencyService {
-    
+
     // --- 缓存配置 ---
     private static let kRatesKey = "cached_exchange_rates" // 存汇率数据的 Key
     private static let kDateKey = "last_fetch_date"        // 存上次更新时间的 Key
@@ -55,9 +55,8 @@ struct CurrencyService {
                 return cachedRates
             }
         }
-        
-        // 2. 如果没缓存，或者数据过期了 -> 联网下载
-        print("🌍 正在联网更新汇率...")
+
+        print("🌍 正在联网更新汇率 (base: \(base))...")
         do {
             let rates = try await fetchRemoteRates(base: base)
             // 下载成功后，立刻存入本地
@@ -65,21 +64,23 @@ struct CurrencyService {
             return rates
         } catch {
             print("❌ 网络请求失败: \(error)")
-            // 3. 兜底：万一断网了，尝试读取旧的缓存（哪怕过期了也比没有强）
-            return loadLocalRates() ?? [:]
+            if let cached = loadLocalRates(), cached.base.caseInsensitiveCompare(base) == .orderedSame {
+                return cached.rates
+            }
+            return [base: 1.0]
         }
     }
-    
+
     // --- 内部方法：联网下载 (私有) ---
     private static func fetchRemoteRates(base: String) async throws -> [String: Double] {
         let urlString = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/\(base.lowercased()).json"
         guard let url = URL(string: urlString) else { return [:] }
-        
+
         let (data, _) = try await URLSession.shared.data(from: url)
         let response = try JSONDecoder().decode(FrankfurterLatestResponse.self, from: data)
         return response.rates
     }
-    
+
     // --- 内部方法：存入 UserDefaults ---
     private static func saveRatesLocally(_ rates: [String: Double], base: String) {
         // 1. 存汇率 (字典自动转 Data)
@@ -91,11 +92,11 @@ struct CurrencyService {
         // 3. 存当前基准币种
         UserDefaults.standard.set(base, forKey: kBaseKey)
     }
-    
+
     // --- 内部方法：读取 UserDefaults ---
-    private static func loadLocalRates() -> [String: Double]? {
+    private static func loadLocalRates() -> CachedRates? {
         guard let data = UserDefaults.standard.data(forKey: kRatesKey) else { return nil }
-        return try? JSONDecoder().decode([String: Double].self, from: data)
+        return try? JSONDecoder().decode(CachedRates.self, from: data)
     }
     
 }

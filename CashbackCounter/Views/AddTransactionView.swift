@@ -29,6 +29,7 @@ struct AddTransactionView: View {
     
     // AI 分析状态
     @State private var isAnalyzing: Bool = false
+    @EnvironmentObject private var aiAvailability: AppleIntelligenceAvailability
     @State private var showFullImage = false
     @State private var showImagePicker: Bool = false
 
@@ -118,7 +119,7 @@ struct AddTransactionView: View {
                 // --- 第一组：消费详情 ---
                 Section(header: Text("消费详情")) {
                     TextField("商户名称 (例如：星巴克)", text: $merchant)
-                    
+
                     HStack {
                         Text(location.currencySymbol)
                             .fontWeight(.bold)
@@ -151,6 +152,12 @@ struct AddTransactionView: View {
                         ForEach(Region.allCases, id: \.self) { r in
                             Text("\(r.icon) \(r.rawValue)").tag(r)
                         }
+                    }
+                }
+
+                if !aiAvailability.isSupported {
+                    Section {
+                        Label("Apple Intelligence 当前不可用，已切换为手动填写模式。", systemImage: "info.circle")
                     }
                 }
                 
