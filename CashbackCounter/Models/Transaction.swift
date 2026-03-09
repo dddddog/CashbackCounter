@@ -12,13 +12,20 @@ class Transaction: Identifiable {
     
     var date: Date
     var cashbackamount: Double
+    var pointsEarned: Int
     var rate: Double
     
     var card: CreditCard?
     
+    // 👇 1. 新增字段：记录消费方式 (Apple Pay, 线下等)
+    var paymentMethod: PaymentMethod
+    
     @Attribute(.externalStorage) var receiptData: Data?
     
-    // 👇 修改 init 方法，增加 cashbackAmount 参数
+    @Relationship(deleteRule: .cascade, inverse: \Income.transaction)
+    var incomes: [Income]?
+    
+    // 👇 2. 更新构造函数
     init(merchant: String,
          category: Category,
          location: Region,
@@ -27,7 +34,10 @@ class Transaction: Identifiable {
          card: CreditCard?,
          receiptData: Data? = nil,
          billingAmount: Double? = nil,
-         cashbackAmount: Double? = nil // 👈 新增可选参数
+         cashbackAmount: Double? = nil,
+         pointsEarned: Int = 0,
+         // 新增参数：设置默认值 .offline，这样旧代码不需要改动即可编译
+         paymentMethod: PaymentMethod = .offline
     ) {
         self.merchant = merchant
         self.category = category
@@ -38,27 +48,31 @@ class Transaction: Identifiable {
         self.receiptData = receiptData
         self.billingAmount = billingAmount ?? amount
         
+        // 赋值
+        self.paymentMethod = paymentMethod
+        
         let finalBilling = billingAmount ?? amount
         
-        // 1. 记录名义费率 (用于界面显示，比如 "5%")
-        // 这里依然调用 getRate，得到的是 "基础+加成" 的理论总费率
-        let nominalRate = card?.getRate(for: category, location: location) ?? 0
-        self.rate = nominalRate
+        // 计算名义费率
+        // 注意：如果你后续更新了 CreditCard.getRate 支持 paymentMethod，这里也要跟着改
+        // 目前先保持原逻辑，避免报错
+        let nominalRate = card?.getRate(for: category, location: location, payment: paymentMethod) ?? 0
         
-        // 2. 确定实际返现额 (优先使用传入的计算结果)
         if let providedCashback = cashbackAmount {
-            // 如果外部传了（也就是经过了上限计算），就用外部的
             self.cashbackamount = providedCashback
+            self.rate = (providedCashback / finalBilling * 100).rounded() / 100
         } else {
-            // 兜底：如果没传，就按简单的 费率*金额 算 (兼容旧代码)
             self.cashbackamount = finalBilling * nominalRate
+            self.rate = nominalRate
         }
+
+        self.pointsEarned = pointsEarned
     }
     
     var color: Color { category.color }
     var dateString: String {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd" // 你可以改成 "yyyy-MM-dd" 或 "MM月dd日"
-            return formatter.string(from: date)
-        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
 }

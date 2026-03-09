@@ -29,6 +29,7 @@ struct CashbackCounterApp: App { // 2. 这个结构体必须遵守 App 协议
                 aiAvailability.refreshSupportStatus()
             }
         }
-        .modelContainer(for: [Transaction.self, CreditCard.self])
+        .modelContainer(for: [Transaction.self, CreditCard.self, CardTemplate.self, Income.self, Point.self, PointAdjustment.self])
+        
     }
 }

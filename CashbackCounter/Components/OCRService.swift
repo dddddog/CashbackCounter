@@ -10,6 +10,21 @@ import UIKit
 import FoundationModels // 引入 AI 框架
 import ImageIO          // 用于处理图片方向
 
+struct RecognizedElement: Hashable {
+    let text: String
+    let xPosition: CGFloat
+    let boundingBox: CGRect
+}
+
+struct RecognizedRow: Hashable {
+    let yPosition: CGFloat
+    let elements: [RecognizedElement]
+
+    var text: String {
+        elements.map(\.text).joined(separator: " ")
+    }
+}
+
 struct OCRService {
     
     @MainActor static let aiParser = ReceiptParser()
@@ -71,12 +86,15 @@ struct OCRService {
         if upperText.contains("NZD") { return .nz }
         if upperText.contains("CNY") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
         if upperText.contains("USD") { return .us }
+        if upperText.contains("MOP") || upperText.contains("macau") { return .mo }
+        if upperText.contains("EUR") || upperText.contains("EURO") || upperText.contains("€"){ return .other }
+        if upperText.contains("GBP") || upperText.contains("uk") || upperText.contains("£") { return .uk }
         
         // 2. 弱特征：看地名或特殊符号 (如果货币没找到)
         if upperText.contains("合計") || upperText.contains("料金") { return .jp }
         if upperText.contains("HONG KONG") { return .hk }
         if upperText.contains("TAIPEI") || text.contains("台灣") { return .tw }
-        if upperText.contains("USA") || upperText.contains("US$") { return .us } // 美国小票常有 TAX
+        if upperText.contains("USA") || upperText.contains("US$") { return .us }
         
         // 3. 符号特征 (¥ 比较难办，中日都用，默认不处理或按概率给一个)
         if text.contains("金额") || text.contains("交易") { return .cn }
@@ -93,10 +111,10 @@ struct OCRService {
         case .cn:
             // 简中区
             return ["zh-Hans", "en-US", "ja-JP"]
-        case .hk, .tw:
+        case .hk, .tw, .mo:
             // 繁中区
             return ["zh-Hant", "en-US", "ja-JP"]
-        case .us, .nz, .other:
+        case .us, .nz, .other, .uk:
             // 英语区
             return ["en-US", "zh-Hans", "ja-JP"]
         }
@@ -122,6 +140,68 @@ struct OCRService {
             try? requestHandler.perform([request])
         }
     }
+
+    static func recognizeObservations(from image: UIImage, languages: [String]) async -> [VNRecognizedTextObservation] {
+        guard let cgImage = image.cgImage else { return [] }
+        let orientation = cgImageOrientation(from: image.imageOrientation)
+
+        return await withCheckedContinuation { continuation in
+            let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
+            let request = VNRecognizeTextRequest { request, error in
+                guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                continuation.resume(returning: observations)
+            }
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = languages
+            try? requestHandler.perform([request])
+        }
+    }
+
+    static func reconstructRows(from observations: [VNRecognizedTextObservation]) -> [RecognizedRow] {
+        let elements: [RecognizedElement] = observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            let box = observation.boundingBox
+            return RecognizedElement(text: text, xPosition: box.midX, boundingBox: box)
+        }
+
+        guard !elements.isEmpty else { return [] }
+
+        let heights = elements.map { $0.boundingBox.height }.sorted()
+        let medianHeight = heights[heights.count / 2]
+        let rowThreshold = medianHeight * 0.6
+
+        let sortedElements = elements.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+        var rows: [RecognizedRow] = []
+        var currentRow: [RecognizedElement] = []
+        var lastY: CGFloat?
+        var lastHeight: CGFloat?
+
+        for element in sortedElements {
+            let elementHeight = element.boundingBox.height
+            let localThreshold = min(rowThreshold, min(elementHeight, lastHeight ?? elementHeight) * 0.8)
+            if let lastY, abs(element.boundingBox.midY - lastY) < localThreshold {
+                currentRow.append(element)
+            } else {
+                if !currentRow.isEmpty {
+                    rows.append(buildRow(from: currentRow))
+                }
+                currentRow = [element]
+            }
+            lastY = element.boundingBox.midY
+            lastHeight = elementHeight
+        }
+
+        if !currentRow.isEmpty {
+            rows.append(buildRow(from: currentRow))
+        }
+
+        return splitRowsIfNeeded(rows, baselineHeight: medianHeight)
+    }
     
     static func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
         switch uiOrientation {
@@ -135,5 +215,54 @@ struct OCRService {
         case .rightMirrored: return .rightMirrored
         @unknown default: return .up
         }
+    }
+
+    private static func buildRow(from elements: [RecognizedElement]) -> RecognizedRow {
+        let sorted = elements.sorted { $0.xPosition < $1.xPosition }
+        let avgY = sorted.reduce(CGFloat.zero) { $0 + $1.boundingBox.midY } / CGFloat(sorted.count)
+        return RecognizedRow(yPosition: avgY, elements: sorted)
+    }
+
+    private static func splitRowsIfNeeded(_ rows: [RecognizedRow], baselineHeight: CGFloat) -> [RecognizedRow] {
+        let splitThreshold = baselineHeight * 1.1
+        let clusterThreshold = baselineHeight * 0.4
+        var output: [RecognizedRow] = []
+
+        for row in rows {
+            let elements = row.elements
+            guard elements.count > 1 else {
+                output.append(row)
+                continue
+            }
+
+            let minY = elements.map { $0.boundingBox.minY }.min() ?? 0
+            let maxY = elements.map { $0.boundingBox.maxY }.max() ?? 0
+            if (maxY - minY) <= splitThreshold {
+                output.append(row)
+                continue
+            }
+
+            let sortedByY = elements.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+            var current: [RecognizedElement] = []
+            var lastY: CGFloat?
+
+            for element in sortedByY {
+                if let lastY, abs(element.boundingBox.midY - lastY) < clusterThreshold {
+                    current.append(element)
+                } else {
+                    if !current.isEmpty {
+                        output.append(buildRow(from: current))
+                    }
+                    current = [element]
+                }
+                lastY = element.boundingBox.midY
+            }
+
+            if !current.isEmpty {
+                output.append(buildRow(from: current))
+            }
+        }
+
+        return output
     }
 }

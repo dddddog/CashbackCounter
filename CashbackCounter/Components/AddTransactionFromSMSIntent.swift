@@ -24,7 +24,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
 
     private static let sharedModelContainer: ModelContainer = {
         do {
-            return try ModelContainer(for: Transaction.self, CreditCard.self)
+            return try ModelContainer(for: Transaction.self, CreditCard.self, Point.self)
         } catch {
             fatalError("Failed to create shared model container: \(error)")
         }
@@ -77,12 +77,31 @@ struct AddTransactionFromSMSIntent: AppIntent {
 
         // 计算入账金额和返现
         let billingAmount = amount    // 如需跨币种，可根据汇率再计算
-        let cashback = selectedCard?.calculateCappedCashback(
-            amount: billingAmount,
-            category: category,
-            location: region,
-            date: date
-        ) ?? 0.0
+        var cashback: Double = 0.0
+        var pointsEarned: Int = 0
+        if let card = selectedCard {
+            if card.rewardType == .points {
+                let pointValue = await resolvePointValueInCardCurrency(pointProgram: card.pointProgram, cardCurrency: card.issueRegion.currencyCode)
+                let result = card.calculateCappedPoints(
+                    amount: billingAmount,
+                    category: category,
+                    location: region,
+                    date: date,
+                    paymentMethod: .offline,
+                    pointValueInCardCurrency: pointValue
+                )
+                cashback = result.value
+                pointsEarned = result.points
+            } else {
+                cashback = card.calculateCappedCashback(
+                    amount: billingAmount,
+                    category: category,
+                    location: region,
+                    date: date,
+                    paymentMethod: .offline
+                )
+            }
+        }
 
         // 创建并保存交易
         let newTransaction = Transaction(
@@ -94,11 +113,25 @@ struct AddTransactionFromSMSIntent: AppIntent {
             card: selectedCard,
             receiptData: nil,
             billingAmount: billingAmount,
-            cashbackAmount: cashback
+            cashbackAmount: cashback,
+            pointsEarned: pointsEarned
         )
         modelContext.insert(newTransaction)
         try modelContext.save()
         // 返回意图执行结果，系统会在快捷指令中显示“完成”
         return .result(dialog: "已成功添加账单：\(merchant) – ¥\(amount)")
+    }
+
+    private func resolvePointValueInCardCurrency(pointProgram: Point?, cardCurrency: String) async -> Double {
+        guard let pointProgram else { return 0 }
+        let pointRegion = pointProgram.valueCurrencyCode
+        if pointRegion.currencyCode == cardCurrency {
+            return pointProgram.pointValue
+        }
+        let rates = await CurrencyService.getRates(base: pointRegion.currencyCode)
+        if let rate = rates[cardCurrency], rate > 0 {
+            return pointProgram.pointValue * rate
+        }
+        return pointProgram.pointValue
     }
 }

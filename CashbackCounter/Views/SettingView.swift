@@ -6,68 +6,91 @@
 //
 
 import SwiftUI
+import SwiftData
+import UIKit
+
+// MARK: - Helper Models
+// 1. 新增：用于封装分享数据的结构体，遵循 Identifiable 协议
+// 这解决了 .sheet(isPresented:) 导致的时序问题
+struct ShareData: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
 
 struct SettingsView: View {
-    // 获取 App 版本号
+    // MARK: - Properties
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-    // 1. 外观设置 (0=跟随, 1=浅色, 2=深色)
+    
     @AppStorage("userTheme") private var userTheme: Int = 0
-        
-    // 2. 语言设置 "system" = 跟随系统, "zh-Hans" = 中文, "en" = 英文
     @AppStorage("userLanguage") private var userLanguage: String = "system"
+    @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
+    
+    @Environment(\.modelContext) var context
+    @State private var showConfirmClear: Bool = false
+    
+    // 获取数据库数据
+    @Query var cards: [CreditCard]
+    @Query(
+        sort: [
+            SortDescriptor(\Transaction.date, order: .reverse),
+            SortDescriptor(\Transaction.merchant, order: .forward)
+        ]
+    )
+    var transactions: [Transaction]
+    
+    // MARK: - Export State
+    // 2. 修改：使用 item 形式的状态来控制 Sheet
+    @State private var shareData: ShareData?
+    // 3. 新增：控制导出过程中的 Loading 状态
+    @State private var isExporting = false
+
+    // MARK: - Body
     var body: some View {
         NavigationView {
             List {
-            // 👇👇👇 1. 新增：顶部的 App 图标 Header 👇👇👇
+                // Header Section
                 Section {
                     VStack(spacing: 8) {
-                        // 图标组合
                         ZStack {
-                            // 背景装饰 (可选，增加层次感)
                             Circle()
                                 .fill(Color.blue.opacity(0.1))
                                 .frame(width: 80, height: 80)
                             
-                            // 1. 卡片
                             Image(systemName: "creditcard.fill")
                                 .font(.system(size: 40))
                                 .foregroundColor(.blue)
-                                .offset(x: -5, y: 0) // 稍微往左偏一点
+                                .offset(x: -5, y: 0)
                             
-                            // 2. 循环圈 (叠加在右下角)
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .font(.system(size: 24))
                                 .foregroundColor(.green)
                                 .padding(4)
-                            // 加个白色底色，防止和卡片重叠部分看不清
                                 .background(Color(uiColor: .systemGroupedBackground).clipShape(Circle()))
                                 .offset(x: 18, y: 12)
                         }
                         .padding(.bottom, 4)
                         
-                        // App 名称
                         Text("Cashback Counter")
                             .font(.headline)
                             .fontWeight(.bold)
                         
-                        // 版本号
                         Text("Version \(appVersion)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .frame(maxWidth: .infinity) // 让它水平居中
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                 }
-                    .listRowBackground(Color.clear)
+                .listRowBackground(Color.clear)
+                
+                // Appearance Section
                 Section(header: Text("外观与语言")) {
-                    // 主题选择
                     Picker(selection: $userTheme, label: Label("主题模式", systemImage: "paintpalette")) {
                         Text("跟随系统").tag(0)
                         Text("浅色模式").tag(1)
                         Text("深色模式").tag(2)
                     }
                     
-                    // ✨ 语言选择
                     Picker(selection: $userLanguage, label: Label("语言设置", systemImage: "globe")) {
                         Text("跟随系统").tag("system")
                         Text("简体中文").tag("zh-Hans")
@@ -75,10 +98,14 @@ struct SettingsView: View {
                         Text("English").tag("en")
                     }
                 }
-                // 1. 常规设置 (预留位置)
+                
+                // General Section
                 Section(header: Text("常规")) {
-                    NavigationLink(destination: Text("更多货币支持正在开发中...")) {
-                        Label("多币种设置", systemImage: "banknote")
+                    Picker(selection: $mainCurrencyCode, label: Label("主货币", systemImage: "banknote")) {
+                        Text("人民币 (CNY)").tag("CNY")
+                        Text("美元 (USD)").tag("USD")
+                        Text("港币 (HKD)").tag("HKD")
+                        Text("日元 (JPY)").tag("JPY")
                     }
                     
                     NavigationLink(destination: NotificationSettingsView()) {
@@ -86,22 +113,33 @@ struct SettingsView: View {
                     }
                 }
                 
-                // 2. 数据管理 (你可以考虑把导入导出逻辑迁移到这里)
+                // Data Management Section
                 Section(header: Text("数据管理")) {
-                    Label("iCloud 同步 (自动开启)", systemImage: "icloud")
-                        .foregroundColor(.secondary)
-                    
-                    // 这是一个提示，告诉用户去哪里导出
-                    HStack {
-                        Label("数据导入/导出", systemImage: "square.and.arrow.up")
-                        Spacer()
-                        Text("见首页右上角")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                    Button {
+                        startExportProcess()
+                    } label: {
+                        HStack {
+                            Label("全部数据导出", systemImage: "square.and.arrow.up")
+                            Spacer()
+                            
+                            if isExporting {
+                                ProgressView()
+                                    .padding(.leading, 5)
+                            } else {
+                                Text("导出卡片与账单")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .disabled(isExporting) // 导出过程中禁止重复点击
+
+                    NavigationLink(destination: PrivacyPolicyView()) {
+                        Label("隐私政策", systemImage: "hand.raised")
                     }
                 }
                 
-                // 3. 关于
+                // About Section
                 Section(header: Text("关于 Cashback Counter")) {
                     HStack {
                         Label("版本", systemImage: "info.circle")
@@ -110,30 +148,174 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Label("开发者: Junhao Huang", systemImage: "person.crop.circle")
-                    
-                    // 如果有 GitHub 地址可以放这里
-                    Link(destination: URL(string: "https://github.com/raytracingon/cashbackcounter")!) {
-                        Label("项目主页", systemImage: "link")
+                    NavigationLink(destination: DeveloperView()) {
+                        Label("开发者/贡献者", systemImage: "person.crop.circle")
+                    }
+                }
+
+                Section(header: Text("更新说明")) {
+                    NavigationLink(destination: UpdateNotesView(appVersion: appVersion)) {
+                        Label("更新版本注意事项", systemImage: "exclamationmark.triangle")
                     }
                 }
                 
-                // 4. 其它
+                // Reset Section
                 Section {
                     Button(role: .destructive) {
-                        // 这里可以放清空数据的逻辑
+                        showConfirmClear = true
                     } label: {
                         Label("重置所有数据 (慎用)", systemImage: "trash")
                             .foregroundColor(.red)
                     }
+                    .confirmationDialog(
+                        "确定要清除所有数据吗？",
+                        isPresented: $showConfirmClear,
+                        titleVisibility: .visible
+                    ) {
+                        Button("清除", role: .destructive) {
+                            clearAllData()
+                        }
+                        Button("取消", role: .cancel) {}
+                    }
                 }
             }
             .navigationTitle("设置")
-            .listStyle(.insetGrouped) // 使用 iOS 风格的分组列表
+            .listStyle(.insetGrouped)
+            // 4. 关键修复：使用 item: $shareData 绑定
+            // 只有当 shareData 有值时，才会初始化并显示 ActivityViewController
+            .sheet(item: $shareData) { data in
+                ActivityViewController(activityItems: data.items)
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+    
+    // MARK: - Logic Methods
+    
+    /// 开始异步导出流程
+    private func startExportProcess() {
+        // 1. 开启 Loading 状态
+        isExporting = true
+        
+        Task {
+            // 2. 稍微延迟一点点 (0.2秒)，让 UI 有机会刷新出 ProgressView
+            // 否则在主线程做繁重工作会直接卡住 UI，连转圈都看不到
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            
+            // 3. 执行导出数据生成 (耗时操作)
+            let items = generateExportItems()
+            
+            // 4. 完成后更新 UI 状态
+            // Task 在 SwiftUI View 中默认运行在 MainActor，所以可以直接更新 State
+            isExporting = false
+            
+            if !items.isEmpty {
+                // 赋值给 shareData，自动触发 .sheet(item: ...)
+                self.shareData = ShareData(items: items)
+            }
+        }
+    }
+    
+    /// 生成导出文件 (CSV + ZIP)
+    private func generateExportItems() -> [Any] {
+        var items: [Any] = []
+        
+        // A. 导出卡片 CSV
+        if let cardCSV = cards.exportCSVFile() {
+            items.append(cardCSV)
+        }
+        
+        // B. 导出账单+收据 ZIP
+        if let backupZip = transactions.exportReceiptsZip() {
+            items.append(backupZip)
+        }
+        
+        return items
+    }
+    
+    private func clearAllData() {
+        do {
+            try deleteAll(of: Transaction.self)
+            try deleteAll(of: CreditCard.self)
+            try context.save()
+            print("✅ All data cleared")
+        } catch {
+            print("❌ Failed to clear data: \(error)")
+        }
+    }
+
+    private func deleteAll<T>(of type: T.Type) throws where T: SwiftData.PersistentModel {
+        let descriptor = SwiftData.FetchDescriptor<T>()
+        let items = try context.fetch(descriptor)
+        for item in items {
+            context.delete(item)
         }
     }
 }
 
-#Preview {
-    SettingsView()
+private struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("隐私政策")
+                    .font(.title2.weight(.semibold))
+                    .padding(.bottom, 4)
+
+                Text("我们重视你的隐私。以下为应用当前版本的隐私说明：")
+                    .foregroundColor(.secondary)
+
+                Text("• 数据存储：账单、卡片、积分等数据全部保存在你的设备本地，我们不上传任何个人数据。")
+                Text("• 网络请求：应用可能会为获取汇率、下载卡面等功能访问网络，仅下载必要参数。")
+                Text("• 权限使用：相机、相册、通知等权限仅在对应功能使用时申请，可在系统设置中随时关闭。")
+                Text("• 分享导出：仅当你主动使用“导出”功能时，数据才会通过系统导出面板离开应用。")
+
+                Text("若你对隐私相关内容有疑问，请联系开发者。")
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle("隐私政策")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct UpdateNotesView: View {
+    let appVersion: String
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("更新版本注意事项")
+                    .font(.title2.weight(.semibold))
+                    .padding(.bottom, 4)
+
+                Text("当前版本：v\(appVersion)")
+                    .foregroundColor(.secondary)
+
+                Text("• 更新前建议使用“全部数据导出”进行备份！！！（重要）。")
+                Text("• 更新后首次打开可能需要短暂时间完成数据整理。")
+                Text("• 若更新后出现应用闪退或异常的情况请删除应用，重新下载并导入之前备份的数据")
+                Text("• 若问题仍存在，请联系开发者协助排查。")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle("更新注意事项")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - ActivityViewController
+struct ActivityViewController: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

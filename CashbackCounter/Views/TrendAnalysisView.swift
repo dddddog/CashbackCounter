@@ -9,8 +9,8 @@ enum TrendType {
     
     var title: String {
         switch self {
-        case .expense: return String(localized:"支出")
-        case .cashback: return String(localized:"返现")
+        case .expense : return "支出"
+        case .cashback: return "返现"
         }
     }
     
@@ -31,6 +31,7 @@ struct MonthlyData: Identifiable {
 
 struct TrendAnalysisView: View {
     @Environment(\.dismiss) var dismiss
+    @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
     
     // 外部传入的数据
     var transactions: [Transaction]
@@ -41,6 +42,28 @@ struct TrendAnalysisView: View {
     let type: TrendType
     
     @State private var selectedCard: CreditCard? = nil
+
+    private func exchangeRate(for currencyCode: String) -> Double {
+        if currencyCode == mainCurrencyCode { return 1.0 }
+        if let rate = exchangeRates[currencyCode] { return rate }
+        if let rate = exchangeRates[currencyCode.uppercased()] { return rate }
+        if let rate = exchangeRates[currencyCode.lowercased()] { return rate }
+        return 1.0
+    }
+
+    private func billingCurrencyCode(for transaction: Transaction) -> String {
+        guard let card = transaction.card else {
+            return transaction.location.currencyCode
+        }
+
+        // Legacy import: billingAmount was saved in transaction currency (no FX conversion).
+        if transaction.location != card.issueRegion,
+           abs(transaction.billingAmount - transaction.amount) < 0.0001 {
+            return transaction.location.currencyCode
+        }
+
+        return card.issueRegion.currencyCode
+    }
     
     // 计算图表数据
     var chartData: [MonthlyData] {
@@ -63,16 +86,18 @@ struct TrendAnalysisView: View {
                 // 计算总额 (根据类型区分逻辑)
                 let total = monthlyTransactions.reduce(0) { sum, t in
                     let amountToAdd: Double
+                    let currencyCode: String
                     // 👇 分支逻辑
                     if type == .expense {
                         amountToAdd = t.billingAmount // 支出算入账金额
+                        currencyCode = billingCurrencyCode(for: t)
                     } else {
                         amountToAdd = CashbackService.calculateCashback(for: t) // 返现算返现额
+                        currencyCode = t.card?.issueRegion.currencyCode ?? mainCurrencyCode
                     }
                     
                     // 汇率换算
-                    let code = t.card?.issueRegion.currencyCode ?? "CNY"
-                    let rate = exchangeRates[code] ?? 1.0
+                    let rate = exchangeRate(for: currencyCode)
                     return sum + (amountToAdd / rate)
                 }
                 
@@ -88,13 +113,24 @@ struct TrendAnalysisView: View {
                 
                 // --- 1. 图表区域 ---
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(selectedCard == nil ? "总\(type.title)趋势" : "\(selectedCard!.bankName) \(type.title)趋势")
-                        .font(.headline)
-                        .padding(.horizontal)
-                        .padding(.top, 16)
+                    Group {
+                        if let card = selectedCard {
+                            // 「招商银行 支出趋势」这种
+                            Text("\(card.bankName) \(type.title)趋势")
+                                .font(.headline)
+                                .padding(.horizontal)
+                                .padding(.top, 16)
+                        } else {
+                            // 「总支出趋势」这种
+                            Text("总\(type.title)趋势")
+                                .font(.headline)
+                                .padding(.horizontal)
+                                .padding(.top, 16)
+                        }
+                    }
                     
                     // 动态颜色
-                    Text("近12个月累计: ¥\(String(format: "%.2f", chartData.reduce(0){$0 + $1.amount}))")
+                    Text("近12个月累计: \(chartData.reduce(0){ $0 + $1.amount }.formatted(.currency(code: mainCurrencyCode)))")
                         .font(.title2)
                         .fontWeight(.bold)
                         .padding(.horizontal)
@@ -209,7 +245,9 @@ struct TrendAnalysisView: View {
                 .listStyle(.insetGrouped)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("\(type.title)分析") // 👇 动态标题
+            .navigationTitle(
+                Text("\(type.title)分析")
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

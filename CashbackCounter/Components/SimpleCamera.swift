@@ -16,6 +16,7 @@ class CameraService: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()
     @Published var output = AVCapturePhotoOutput()
     @Published var recentImage: UIImage? // 存刚才拍的照片
+    private var isConfigured = false
     
     // 检查权限并启动
     func checkPermissions() {
@@ -33,6 +34,12 @@ class CameraService: NSObject, ObservableObject {
     
     // 配置相机输入输出
     func setup() {
+        // 避免重复配置，如果已经配置过只需确保会话正在运行
+        if isConfigured {
+            startSessionIfNeeded()
+            return
+        }
+        
         do {
             session.beginConfiguration()
             
@@ -45,13 +52,26 @@ class CameraService: NSObject, ObservableObject {
             if session.canAddOutput(output) { session.addOutput(output) }
             
             session.commitConfiguration()
+            isConfigured = true
             
             // 3. 开始流动画面 (必须在后台线程)
-            DispatchQueue.global(qos: .background).async {
-                self.session.startRunning()
-            }
+            startSessionIfNeeded()
         } catch {
             print(error.localizedDescription)
+        }
+    }
+    
+    private func startSessionIfNeeded() {
+        guard !session.isRunning else { return }
+        DispatchQueue.global(qos: .background).async {
+            self.session.startRunning()
+        }
+    }
+    
+    func stopSession() {
+        guard session.isRunning else { return }
+        DispatchQueue.global(qos: .background).async {
+            self.session.stopRunning()
         }
     }
     
@@ -71,19 +91,27 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
 }
 
 // 2. 也是一个 UIViewRepresentable，把相机画面转成 View
+final class CameraPreviewView: UIView {
+    override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+    
+    var previewLayer: AVCaptureVideoPreviewLayer {
+        guard let layer = layer as? AVCaptureVideoPreviewLayer else {
+            fatalError("Layer is not AVCaptureVideoPreviewLayer.")
+        }
+        return layer
+    }
+}
+
 struct CameraPreview: UIViewRepresentable {
     @ObservedObject var cameraService: CameraService
+    typealias UIViewType = CameraPreviewView
     
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: UIScreen.main.bounds)
-        
-        let previewLayer = AVCaptureVideoPreviewLayer(session: cameraService.session)
-        previewLayer.frame = view.frame
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-        
+    func makeUIView(context: Context) -> CameraPreviewView {
+        let view = CameraPreviewView(frame: .zero)
+        view.previewLayer.session = cameraService.session
+        view.previewLayer.videoGravity = .resizeAspectFill
         return view
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {}
+    func updateUIView(_ uiView: CameraPreviewView, context: Context) {}
 }

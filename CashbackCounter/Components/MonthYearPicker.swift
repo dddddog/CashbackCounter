@@ -6,7 +6,7 @@ struct MonthYearPicker: View {
     @Environment(\.dismiss) var dismiss
     
     // 年份范围
-    private let years: [Int] = Array((Calendar.current.component(.year, from: Date()) - 10)...(Calendar.current.component(.year, from: Date()) + 10))
+    private let years: [Int] = Array((Calendar.current.component(.year, from: Date()) - 10)...(Calendar.current.component(.year, from: Date())))
     
     // 月份范围：0 代表 "全年"，1-12 代表月份
     private let months: [Int] = Array(0...12)

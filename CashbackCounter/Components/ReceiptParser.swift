@@ -69,8 +69,63 @@ final class ReceiptParser {
         "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera." // 👈 新增：友都八喜/Bic Camera
         "- 'other': Anything that doesn't fit above."
     }
+
+    private let statementCardInstructions = Instructions{
+        "You are an expert credit card statement parser."
+        "Extract the card product name and the last 4 digits of the card."
+        "If a field is missing, return nil for it."
+        "Do not guess. Use only information present in the statement text."
+        "Extract the card product name and the last 4 digits of the card."
+        "If a field is missing, return nil for it."
+        "Do not guess. Use only information present in the statement text."
+    }
+
+    private let statementTransactionInstructions = Instructions{
+        "You are an expert transaction classifier."
+        "Infer transaction region, payment method, and category from the provided transaction summary."
+        "Use merchant name, currency code/symbols, and context words to infer region."
+        "CRITICAL RULES FOR CATEGORIZATION:"
+        "- Analyze the merchant name and items purchased."
+        "- 'dining': Restaurants, Cafes, Starbucks, Izakaya (居酒屋), Ramen (ラーメン)." // 👈 新增：居酒屋/拉面
+        "- 'grocery': Supermarkets, 7-Eleven, Lawson, FamilyMart, Daily necessities." // 👈 新增：日本常见便利店
+        "- 'travel': Uber, Taxi, Flights, Hotels, Suica, Pasmo, Shinkansen (新幹線)." // 👈 新增：西瓜卡/新干线
+        "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera." // 👈 新增：友都八喜/Bic Camera
+        "- 'other': Anything that doesn't fit above."
+        "Use payment hints such as Apple Pay, online, QR, tap, NFC, or card present/online words."
+        "Extract the original transaction amount in foreign currency if the statement shows exchange details."
+        "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present."
+        "Do not return the billing/settlement amount as foreignAmount."
+        "Extract the original transaction amount in foreign currency if the statement shows exchange details."
+        "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present."
+        "Do not return the billing/settlement amount as foreignAmount."
+        "If unsure, return nil for the field."
+    }
+
+    private let statementRowInstructions = Instructions{
+        "You are an expert credit card statement transaction extractor."
+        "You will be given a single transaction block from OCR."
+        "Extract at most one transaction from this block."
+        "Only return merchant with alphabet characters or necessary numbers."
+        "Only return merchant with alphabet characters or necessary numbers."
+        "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
+        "Ignore blocks that are not transactions (headers, balances, payments, totals, interest, fees)."
+        "For the transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
+        "For the transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
+        "Dates must be in YYYY-MM-DD. If only one date is present, use it for both transactionDate."
+        "billingAmount is the settled amount in statement currency."
+        "Using the foreignCurrency to confirm foreign amount and billing amount"
+        "Using the foreignCurrency to confirm foreign amount and billing amount"
+        "Do not guess. If unsure, return nil for the field."
+        "Do not guess. If unsure, return nil for the field."
+    }
     
     init() {}
+
+    private func normalizedCardLast4(_ value: String?) -> String? {
+        let digits = value?.filter { $0.isNumber } ?? ""
+        guard digits.count >= 4 else { return nil }
+        return String(digits.suffix(4))
+    }
     
     // 3. 解析方法
     func parse(text: String) async throws -> ReceiptMetadata {
@@ -85,8 +140,11 @@ final class ReceiptParser {
                 "Analyze this receipt text:"
                 text
             }
-            
-        return response.content
+
+        let metadata = response.content
+        let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), currency=\(metadata.currency ?? "nil"), date=\(metadata.dateString ?? "nil"), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
         }
     func SMSparse(text: String) async throws -> ReceiptMetadata {
             
@@ -100,8 +158,54 @@ final class ReceiptParser {
                 "Analyze this receipt text:"
                 text
             }
-            
-        return response.content
+
+        let metadata = response.content
+        let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("SMS OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
         }
+
+    func parseStatementCard(text: String) async throws -> StatementCardMetadata {
+        let session = LanguageModelSession(instructions: statementCardInstructions)
+        let response = try await session.respond(
+            generating: StatementCardMetadata.self
+        ) {
+            "Analyze this statement text:"
+            text
+        }
+
+        var metadata = response.content
+        metadata.cardLast4 = normalizedCardLast4(metadata.cardLast4)
+        print("Statement OCR fields: cardLast4=\(metadata.cardLast4 ?? "nil"), cardName=\(metadata.cardName ?? "nil")")
+        return metadata
+    }
+
+    func parseStatementTransaction(text: String) async throws -> StatementTransactionMetadata {
+        let session = LanguageModelSession(instructions: statementTransactionInstructions)
+        let response = try await session.respond(
+            generating: StatementTransactionMetadata.self
+        ) {
+            "Analyze this transaction summary:"
+            text
+        }
+
+        let metadata = response.content
+        print("TEXT",text)
+        let foreignAmountText = metadata.foreignAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("Statement OCR fields: foreignAmount=\(foreignAmountText), payment=\(metadata.paymentMethod?.rawValue ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
+    }
     
+    func parseStatementTransactionBlock(text: String) async throws -> StatementRowTransaction {
+        let session = LanguageModelSession(instructions: statementRowInstructions)
+        let response = try await session.respond(
+            generating: StatementRowTransaction.self
+        ) {
+            "Analyze this statement block:"
+            text
+        }
+
+        return response.content
+    }
+
 }

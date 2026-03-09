@@ -1,40 +1,66 @@
 import Foundation
 
-// 1. 定义 API 响应结构 (保持不变)
-struct FrankfurterLatestResponse: Codable {
-    let amount: Double
-    let base: String
+// 1. 定义 API 响应结构 (适配动态币种键)
+struct FrankfurterLatestResponse: Decodable {
     let date: String
+    let base: String
     let rates: [String: Double]
+
+    private struct DynamicKey: CodingKey {
+        var stringValue: String
+        init?(stringValue: String) { self.stringValue = stringValue }
+        var intValue: Int? { nil }
+        init?(intValue: Int) { return nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+
+        let dateKey = DynamicKey(stringValue: "date")!
+        date = try container.decode(String.self, forKey: dateKey)
+
+        guard let baseKey = container.allKeys.first(where: { $0.stringValue != "date" }) else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: container.codingPath,
+                      debugDescription: "Missing dynamic currency key")
+            )
+        }
+
+        base = baseKey.stringValue
+        rates = try container.decode([String: Double].self, forKey: baseKey)
+    }
 }
 
 struct CurrencyService {
 
     // --- 缓存配置 ---
     private static let kRatesKey = "cached_exchange_rates" // 存汇率数据的 Key
-    private static let cacheValidity: TimeInterval = 12 * 60 * 60 // 12h
-
-    private struct CachedRates: Codable {
-        let base: String
-        let fetchedAt: Date
-        let rates: [String: Double]
-    }
-
+    private static let kDateKey = "last_fetch_date"        // 存上次更新时间的 Key
+    private static let kBaseKey = "last_rates_base"        // 存上次汇率基准币种
+    
     // --- 🚀 智能入口：获取汇率 ---
     // View 层只调用这个方法，不需要关心内部逻辑
     static func getRates(base: String = "CNY") async -> [String: Double] {
-
-        if let cached = loadLocalRates(),
-           cached.base.caseInsensitiveCompare(base) == .orderedSame,
-           abs(cached.fetchedAt.timeIntervalSinceNow) < cacheValidity {
-            print("✅ 汇率使用缓存（基准：\(cached.base)）")
-            return cached.rates
+        print(base)
+        // 1. 检查：今天是不是已经更新过了？并且基准币种一致？
+        if
+            let lastDate = UserDefaults.standard.object(forKey: kDateKey) as? Date,
+            let lastBase = UserDefaults.standard.string(forKey: kBaseKey),
+            lastBase == base,
+            Calendar.current.isDateInToday(lastDate)
+        {
+            // 如果最后更新时间是“今天”，并且基准币种一致，直接读缓存
+            if let cachedRates = loadLocalRates() {
+                print("✅ 汇率无需更新，使用本地缓存 (\(base))")
+                return cachedRates
+            }
         }
 
         print("🌍 正在联网更新汇率 (base: \(base))...")
         do {
             let rates = try await fetchRemoteRates(base: base)
-            saveRatesLocally(rates: rates, base: base)
+            // 下载成功后，立刻存入本地
+            saveRatesLocally(rates, base: base)
             return rates
         } catch {
             print("❌ 网络请求失败: \(error)")
@@ -47,7 +73,7 @@ struct CurrencyService {
 
     // --- 内部方法：联网下载 (私有) ---
     private static func fetchRemoteRates(base: String) async throws -> [String: Double] {
-        let urlString = "https://api.frankfurter.app/latest?from=\(base)"
+        let urlString = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/\(base.lowercased()).json"
         guard let url = URL(string: urlString) else { return [:] }
 
         let (data, _) = try await URLSession.shared.data(from: url)
@@ -56,11 +82,15 @@ struct CurrencyService {
     }
 
     // --- 内部方法：存入 UserDefaults ---
-    private static func saveRatesLocally(rates: [String: Double], base: String) {
-        let cache = CachedRates(base: base, fetchedAt: Date(), rates: rates)
-        if let data = try? JSONEncoder().encode(cache) {
+    private static func saveRatesLocally(_ rates: [String: Double], base: String) {
+        // 1. 存汇率 (字典自动转 Data)
+        if let data = try? JSONEncoder().encode(rates) {
             UserDefaults.standard.set(data, forKey: kRatesKey)
         }
+        // 2. 存时间 (存当前时间)
+        UserDefaults.standard.set(Date(), forKey: kDateKey)
+        // 3. 存当前基准币种
+        UserDefaults.standard.set(base, forKey: kBaseKey)
     }
 
     // --- 内部方法：读取 UserDefaults ---
@@ -69,28 +99,4 @@ struct CurrencyService {
         return try? JSONDecoder().decode(CachedRates.self, from: data)
     }
     
-    static func fetchRate(from source: String, to target: String) async throws -> Double {
-
-        if source == target { return 1.0 }
-
-        let cachedRates = await getRates(base: source)
-        if let rate = cachedRates[target] {
-            return rate
-        }
-
-        // 兜底：直接请求单个币种，避免接口没有覆盖
-        let urlString = "https://api.frankfurter.app/latest?from=\(source)&to=\(target)"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let response = try JSONDecoder().decode(FrankfurterLatestResponse.self, from: data)
-
-        if let rate = response.rates[target] {
-            return rate
-        } else {
-            throw URLError(.cannotParseResponse)
-        }
-    }
 }

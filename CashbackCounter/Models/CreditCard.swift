@@ -8,10 +8,28 @@
 import SwiftUI
 import SwiftData
 
+enum CapPeriod: Codable {
+    case yearly
+    case monthly
+}
+
+enum RewardType: String, Codable, CaseIterable {
+    case cashback
+    case points
+
+    var displayName: String {
+        switch self {
+        case .cashback:
+            return "返现"
+        case .points:
+            return "积分"
+        }
+    }
+}
+
 @Model // 👈 1. 变身数据库表
 class CreditCard: Identifiable {
     // 自动生成的主键，不需要手动 id 了
-    
     var bankName: String
     var type: String
     var endNum: String
@@ -29,9 +47,17 @@ class CreditCard: Identifiable {
     // 3. 字典处理：SwiftData 对字典支持有限，但 Category 是 Codable 的，通常可以直接存。
     // 如果这里报错，我们需要换成 JSON String。目前先尝试直接存。
     var specialRates: [Category: Double]
+    var paymentMethodRates: [PaymentMethod: Double] = [:] // 针对支付方式的加成费率
+
+    var rewardType: RewardType = RewardType.cashback
+    var pointProgram: Point?
+
     
     var issueRegion: Region
     var foreignCurrencyRate: Double?
+
+    // 记录该卡是否来源于某个模板，便于模板更新时同步规则
+    var templateKey: String?
     
     // 👇👇👇 1. 修改上限属性
         
@@ -39,31 +65,42 @@ class CreditCard: Identifiable {
     // 0 代表无上限
     var localBaseCap: Double
     var foreignBaseCap: Double
+    
+    // 返现上限结算周期：按年 / 按月
+    var capPeriod: CapPeriod = CapPeriod.yearly
         
     // B. 类别加成上限 (共用制：不分地区，只看类别)
-    // Key: 消费类别, Value: 该类别的年度总加成上限
-    var categoryCaps: [Category: Double]
+    // Key: 消费类别, Value: 该类别在一个结算周期(capPeriod)内的总加成上限
+    var categoryCaps: [Category: Double] = [:]
+    var paymentCaps: [PaymentMethod: Double] = [:]
         
-    
+    @Attribute(.externalStorage) var cardImageData: Data? = nil // 👈 新增：存储图片二进制数据
     // 👇 4. 建立反向关系 (可选)：这张卡关联了哪些交易？
     // 当你删卡时，关联的交易怎么办？.nullify 意思是把交易里的卡变成空，保留交易记录
     @Relationship(deleteRule: .nullify, inverse: \Transaction.card)
     var transactions: [Transaction]?
     
     init(bankName: String,
-            type: String,
-            endNum: String,
-            colorHexes: [String],
-            defaultRate: Double,
-            specialRates: [Category: Double],
-            issueRegion: Region,
-            foreignCurrencyRate: Double? = nil,
-            // 新参数
-            localBaseCap: Double = 0,
-            foreignBaseCap: Double = 0,
-            categoryCaps: [Category: Double] = [:], // 改为单字典
-            repaymentDay: Int = 0,
-            isRemindOpen: Bool = true
+        type: String,
+        endNum: String,
+        colorHexes: [String],
+        defaultRate: Double,
+        specialRates: [Category: Double],
+        issueRegion: Region,
+        foreignCurrencyRate: Double? = nil,
+        templateKey: String? = nil,
+        // 新参数
+        localBaseCap: Double = 0,
+        foreignBaseCap: Double = 0,
+        categoryCaps: [Category: Double] = [:], // 改为单字典
+        capPeriod: CapPeriod = .yearly,
+        repaymentDay: Int = 0,
+        isRemindOpen: Bool = true,
+        paymentMethodRates: [PaymentMethod: Double] = [:],
+        paymentCaps: [PaymentMethod: Double] = [:],
+        rewardType: RewardType = .cashback,
+        pointProgram: Point? = nil,
+        cardImageData: Data? = nil // 👈 新增参数
     ) {
         self.bankName = bankName
         self.type = type
@@ -73,19 +110,27 @@ class CreditCard: Identifiable {
         self.specialRates = specialRates
         self.issueRegion = issueRegion
         self.foreignCurrencyRate = foreignCurrencyRate
-        
+        self.templateKey = templateKey
+
         // 赋值
         self.localBaseCap = localBaseCap
         self.foreignBaseCap = foreignBaseCap
+        self.capPeriod = capPeriod
         self.categoryCaps = categoryCaps
         self.repaymentDay = repaymentDay
         self.isRemindOpen = isRemindOpen
+        self.paymentMethodRates = paymentMethodRates
+        self.paymentCaps = paymentCaps
+        self.rewardType = rewardType
+        self.pointProgram = pointProgram
+        self.cardImageData = cardImageData // 👈 赋值
     }
     
-    func getRate(for category: Category, location: Region) -> Double {
+    func getRate(for category: Category, location: Region, payment: PaymentMethod) -> Double {
         // 1. 获取类别带来的“额外”加成 (Category Bonus)
         // 使用 ?? 0.0 避免字典里没有该类别时发生崩溃
         let categoryBonus = specialRates[category] ?? 0.0
+        let paymentBonus = paymentMethodRates[payment] ?? 0.0
         
         // 2. 确定基础费率 (Base Rate)
         var baseRate = defaultRate
@@ -97,74 +142,220 @@ class CreditCard: Identifiable {
         }
         
         // 3. 核心修改：将基础费率与类别加成相加
-        return baseRate + categoryBonus
+        return baseRate + categoryBonus + paymentBonus
     }
-    func calculateCappedCashback(amount: Double, category: Category, location: Region, date: Date, transactionToExclude: Transaction? = nil) -> Double {
+    func calculateCappedCashback(amount: Double, category: Category, location: Region, date: Date, paymentMethod: PaymentMethod, transactionToExclude: Transaction? = nil) -> Double {
             
-            let isForeign = (location != issueRegion)
-            
-            // --- 第一步：准备费率和当笔理论值 ---
-            var baseRate = defaultRate
-            if isForeign, let fr = foreignCurrencyRate, fr > 0 {
-                baseRate = fr
-            }
-            let potentialBaseReward = amount * baseRate
-            
-            let bonusRate = specialRates[category] ?? 0.0
-            let potentialBonusReward = amount * bonusRate
-            
-            // --- 第二步：准备上限阈值 ---
-            let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
-            let categoryCapLimit = categoryCaps[category] ?? 0.0
-            
-            // --- 第三步：统计历史用量 ---
-            let calendar = Calendar.current
-            let currentYear = calendar.component(.year, from: date)
-            
-            // 👇 核心修复：筛选时排除掉“正在编辑的这一笔”
-            let yearlyTransactions = (transactions ?? []).filter {
-                let isSameYear = calendar.component(.year, from: $0.date) == currentYear
-                let isNotSelf = ($0 != transactionToExclude) // 排除自己
-                return isSameYear && isNotSelf
-            }
-            
-            // A. 计算已用基础返现 (估算值)
-            var usedBase: Double = 0
-            if baseCapLimit > 0 {
-                usedBase = yearlyTransactions
-                    .filter { ($0.location != self.issueRegion) == isForeign }
-                    .reduce(0) { sum, t in
-                        let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
-                        return sum + (t.billingAmount * tBaseRate)
-                    }
-            }
-            
-            // B. 计算已用加成返现 (估算值)
-            var usedBonus: Double = 0
-            if categoryCapLimit > 0 {
-                usedBonus = yearlyTransactions
-                    .filter { $0.category == category }
-                    .reduce(0) { sum, t in
-                        let tBonusRate = specialRates[t.category] ?? 0.0
-                        return sum + (t.billingAmount * tBonusRate)
-                    }
-            }
-            
-            // --- 第四步：结算 (Reward Cap 逻辑) ---
-            var finalBase = potentialBaseReward
-            if baseCapLimit > 0 {
-                let remaining = max(0, baseCapLimit - usedBase)
-                finalBase = min(potentialBaseReward, remaining)
-            }
-            
-            var finalBonus = potentialBonusReward
-            if categoryCapLimit > 0 {
-                let remaining = max(0, categoryCapLimit - usedBonus)
-                finalBonus = min(potentialBonusReward, remaining)
-            }
-            
-            return finalBase + finalBonus
+        let isForeign = (location != issueRegion)
+        
+        // --- 第一步：准备费率和当笔理论值 ---
+        var baseRate = defaultRate
+        if isForeign, let fr = foreignCurrencyRate, fr > 0 {
+            baseRate = fr
         }
+        let potentialBaseReward = amount * baseRate
+        
+        let categoryBonusRate = specialRates[category] ?? 0.0
+        let paymentBonusRate  = paymentMethodRates[paymentMethod] ?? 0.0 // 确保 CreditCard 有这个字典
+
+        let potentialCategoryReward = amount * categoryBonusRate
+        let potentialPaymentReward  = amount * paymentBonusRate
+            
+        // --- 第二步：准备上限阈值 ---
+        let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
+        let categoryCapLimit = categoryCaps[category] ?? 0.0
+        let paymentCapLimit = paymentCaps[paymentMethod] ?? 0.0 // ⚠️ 确保 CreditCard 类里定义了 paymentCaps
+            
+        // --- 第三步：统计历史用量 ---
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: date)
+        let currentMonth = calendar.component(.month, from: date)
+            
+        // 筛选同一张卡在同一结算周期内的交易（排除正在编辑的这一笔）
+        let periodTransactions = (transactions ?? []).filter { t in
+            let year = calendar.component(.year, from: t.date)
+            guard year == currentYear else { return false }
+            
+            let isNotSelf = (t != transactionToExclude)
+            guard isNotSelf else { return false }
+            
+            switch capPeriod {
+            case .yearly:
+                return true
+            case .monthly:
+                let month = calendar.component(.month, from: t.date)
+                return month == currentMonth
+            }
+        }
+            
+        // A. 计算已用基础返现 (估算值)
+        var usedBase: Double = 0
+        if baseCapLimit > 0 {
+            usedBase = periodTransactions
+                .filter { ($0.location != self.issueRegion) == isForeign }
+                .reduce(0) { sum, t in
+                    // 注意：这里假设历史费率未变
+                    let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
+                    return sum + (t.billingAmount * tBaseRate)
+                }
+        }
+            
+        // B. 计算已用类别加成返现 (Category Used)
+        var usedCategoryBonus: Double = 0 // 💡 改名：明确这是类别用的
+        if categoryCapLimit > 0 {
+            usedCategoryBonus = periodTransactions
+                .filter { $0.category == category }
+                .reduce(0) { sum, t in
+                    let tBonusRate = specialRates[t.category] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate)
+                }
+        }
+        
+        // C. 计算已用支付方式加成返现 (Payment Method Used)
+        var usedPaymentBonus: Double = 0 // 💡 改名：明确这是支付方式用的
+        if paymentCapLimit > 0 {
+            usedPaymentBonus = periodTransactions
+                .filter { $0.paymentMethod == paymentMethod }
+                .reduce(0) { sum, t in
+                    let tBonusRate = paymentMethodRates[t.paymentMethod] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate)
+                }
+        }
+        
+        // --- 第四步：结算 (Reward Cap 逻辑) ---
+        
+        // 1. 结算基础
+        var finalBase = potentialBaseReward
+        if baseCapLimit > 0 {
+            let remaining = max(0, baseCapLimit - usedBase)
+            finalBase = min(potentialBaseReward, remaining)
+        }
+            
+        // 2. 结算类别加成
+        var finalCategoryBonus = potentialCategoryReward
+        if categoryCapLimit > 0 {
+            // ✅ 修正：这里使用 usedCategoryBonus
+            let remaining = max(0, categoryCapLimit - usedCategoryBonus)
+            finalCategoryBonus = min(potentialCategoryReward, remaining)
+        }
+        
+        // 3. 结算支付方式加成
+        var finalPaymentBonus = potentialPaymentReward
+        if paymentCapLimit > 0 {
+            // ✅ 修正：这里必须减去 usedPaymentBonus，而不是 usedCategoryBonus
+            let remaining = max(0, paymentCapLimit - usedPaymentBonus)
+            finalPaymentBonus = min(potentialPaymentReward, remaining)
+        }
+        
+        // --- 第五步：汇总返回 ---
+        return finalBase + finalCategoryBonus + finalPaymentBonus
+    }
+    
+    func calculateCappedPoints(
+        amount: Double,
+        category: Category,
+        location: Region,
+        date: Date,
+        paymentMethod: PaymentMethod,
+        pointValueInCardCurrency: Double,
+        transactionToExclude: Transaction? = nil
+    ) -> (points: Int, value: Double) {
+        guard pointValueInCardCurrency > 0 else {
+            return (points: 0, value: 0)
+        }
+        
+        let isForeign = (location != issueRegion)
+        
+        var baseRate = defaultRate
+        if isForeign, let fr = foreignCurrencyRate, fr > 0 {
+            baseRate = fr
+        }
+        
+        let potentialBasePoints = (amount * baseRate)
+        let categoryBonusRate = specialRates[category] ?? 0.0
+        let paymentBonusRate = paymentMethodRates[paymentMethod] ?? 0.0
+        
+        let potentialCategoryPoints = (amount * categoryBonusRate)
+        let potentialPaymentPoints = (amount * paymentBonusRate)
+        
+        let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
+        let categoryCapLimit = categoryCaps[category] ?? 0.0
+        let paymentCapLimit = paymentCaps[paymentMethod] ?? 0.0
+        
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: date)
+        let currentMonth = calendar.component(.month, from: date)
+        
+        let periodTransactions = (transactions ?? []).filter { t in
+            let year = calendar.component(.year, from: t.date)
+            guard year == currentYear else { return false }
+            
+            let isNotSelf = (t != transactionToExclude)
+            guard isNotSelf else { return false }
+            
+            switch capPeriod {
+            case .yearly:
+                return true
+            case .monthly:
+                let month = calendar.component(.month, from: t.date)
+                return month == currentMonth
+            }
+        }
+        
+        var usedBasePoints: Double = 0
+        if baseCapLimit > 0 {
+            usedBasePoints = periodTransactions
+                .filter { ($0.location != self.issueRegion) == isForeign }
+                .reduce(0) { sum, t in
+                    let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
+                    return sum + (t.billingAmount * tBaseRate)
+                }
+        }
+        
+        var usedCategoryPoints: Double = 0
+        if categoryCapLimit > 0 {
+            usedCategoryPoints = periodTransactions
+                .filter { $0.category == category }
+                .reduce(0) { sum, t in
+                    let tBonusRate = specialRates[t.category] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate)
+                }
+        }
+        
+        var usedPaymentPoints: Double = 0
+        if paymentCapLimit > 0 {
+            usedPaymentPoints = periodTransactions
+                .filter { $0.paymentMethod == paymentMethod }
+                .reduce(0) { sum, t in
+                    let tBonusRate = paymentMethodRates[t.paymentMethod] ?? 0.0
+                    return sum + (t.billingAmount * tBonusRate)
+                }
+        }
+        
+        var finalBasePoints = potentialBasePoints
+        if baseCapLimit > 0 {
+            let remaining = max(0, baseCapLimit - usedBasePoints)
+            finalBasePoints = min(potentialBasePoints, remaining)
+        }
+        
+        var finalCategoryPoints = potentialCategoryPoints
+        if categoryCapLimit > 0 {
+            let remaining = max(0, categoryCapLimit - usedCategoryPoints)
+            finalCategoryPoints = min(potentialCategoryPoints, remaining)
+        }
+        
+        var finalPaymentPoints = potentialPaymentPoints
+        if paymentCapLimit > 0 {
+            let remaining = max(0, paymentCapLimit - usedPaymentPoints)
+            finalPaymentPoints = min(potentialPaymentPoints, remaining)
+        }
+        
+        let totalPoints = finalBasePoints + finalCategoryPoints + finalPaymentPoints
+        let pointsEarned = max(0, Int(floor(totalPoints)))
+        let value = Double(pointsEarned) * pointValueInCardCurrency
+        
+        return (points: pointsEarned, value: value)
+    }
     func calculateCappedCashback(amount: Double, category: Category, location: Region, date: Date) -> Double {
             
             let isForeign = (location != issueRegion)
@@ -188,21 +379,32 @@ class CreditCard: Identifiable {
             let categoryCapLimit = categoryCaps[category] ?? 0.0
             
             // --- 第三步：统计历史用量 (关键) ---
-            // 我们需要计算“今年已经产生了多少理论返现”，来看看是否触发上限
+            // 我们需要计算“当前结算周期已经产生了多少理论返现”，来看看是否触发上限
             
             let calendar = Calendar.current
             let currentYear = calendar.component(.year, from: date)
+            let currentMonth = calendar.component(.month, from: date)
             
-            // 筛选今年的所有交易
-            let yearlyTransactions = (transactions ?? []).filter {
-                calendar.component(.year, from: $0.date) == currentYear
+            // 筛选当前结算周期内的所有交易
+            let periodTransactions = (transactions ?? []).filter { t in
+                let year = calendar.component(.year, from: t.date)
+                guard year == currentYear else { return false }
+                
+                switch capPeriod {
+                case .yearly:
+                    // 同一年即可
+                    return true
+                case .monthly:
+                    let month = calendar.component(.month, from: t.date)
+                    return month == currentMonth
+                }
             }
             
             // A. 计算已用的“基础额度”
             // 规则：只累加“同区域类型”(本币vs外币) 的交易产生的“基础返现”
             var usedBase: Double = 0
             if baseCapLimit > 0 {
-                usedBase = yearlyTransactions
+                usedBase = periodTransactions
                     .filter { ($0.location != self.issueRegion) == isForeign } // 筛选同区域
                     .reduce(0) { sum, t in
                         // 估算历史交易的基础返现 (Spend * BaseRate)
@@ -216,7 +418,7 @@ class CreditCard: Identifiable {
             // 规则：累加“同类别”的交易产生的“加成返现” (不管它是在哪里消费的，因为是共用池)
             var usedBonus: Double = 0
             if categoryCapLimit > 0 {
-                usedBonus = yearlyTransactions
+                usedBonus = periodTransactions
                     .filter { $0.category == category } // 筛选同类别
                     .reduce(0) { sum, t in
                         // 估算历史交易的加成返现

@@ -7,14 +7,17 @@
 
 import FoundationModels
 
+@Generable
 enum Region: String, CaseIterable, Codable {
     case cn = "中国大陆"
-    case hk = "中国香港"
+    case hk = "香港"
     case us = "美国"
     case jp = "日本"
     case nz = "新西兰"
     case tw = "台湾"
-    case other = "其他地区"
+    case mo = "澳门"
+    case uk = "英国"
+    case other = "欧盟"
     
     var icon: String {
         switch self {
@@ -24,7 +27,9 @@ enum Region: String, CaseIterable, Codable {
         case .jp: return "🇯🇵"
         case .nz: return "🇳🇿"
         case .tw: return "🇹🇼"
-        case .other: return "🌍"
+        case .mo: return "🇲🇴"
+        case .uk: return "🇬🇧"
+        case .other: return "🇪🇺"
         }
     }
     var currencySymbol: String {
@@ -35,7 +40,9 @@ enum Region: String, CaseIterable, Codable {
         case .jp: return "JP¥"
         case .nz: return "NZ$"
         case .tw: return "NT$"
-        case .other: return "€" // 或者用通用符号 ¤
+        case .mo: return "MO$"
+        case .uk: return "GB£"
+        case .other: return "EU€" // 或者用通用符号 ¤
         }
     }
     var currencyCode: String {
@@ -46,22 +53,9 @@ enum Region: String, CaseIterable, Codable {
         case .jp: return "JPY"
         case .nz: return "NZD"
         case .tw: return "TWD"
+        case .mo: return "MOP"
+        case .uk: return "GBP"
         case .other: return "EUR"
         }
     }
-    var recognitionLanguages: [String] {
-            switch self {
-            case .jp:
-            // 日本：必须把 ja-JP 放第一，否则片假名容易丢
-                return ["ja-JP", "en-US", "zh-Hans"]
-                
-            case .cn, .hk, .tw:
-            // 中文区：繁简中优先
-                return ["zh-Hans", "zh-Hant", "en-US", "ja-JP"]
-                
-            case .us, .nz, .other:
-            // 英语区：英文优先
-                return ["en-US", "zh-Hans", "ja-JP"]
-            }
-        }
 }
