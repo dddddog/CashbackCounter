@@ -42,7 +42,10 @@ struct TransactionRow: View {
 
     private func convertToMainCurrency(amount: Double, currencyCode: String) -> Double? {
         if currencyCode == mainCurrencyCode { return amount }
-        guard let rate = exchangeRates[currencyCode], rate != 0 else { return nil }
+        let rate = exchangeRates[currencyCode]
+            ?? exchangeRates[currencyCode.uppercased()]
+            ?? exchangeRates[currencyCode.lowercased()]
+        guard let rate, rate != 0 else { return nil }
         return amount / rate
     }
 

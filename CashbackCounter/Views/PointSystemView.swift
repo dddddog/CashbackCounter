@@ -253,7 +253,7 @@ struct PointSystemView: View {
     }
 
     private func normalizeRates(_ rates: [String: Double]) -> [String: Double] {
-        Dictionary(uniqueKeysWithValues: rates.map { ($0.key.lowercased(), $0.value) })
+        Dictionary(rates.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { _, new in new })
     }
 
     private func rateForCurrency(_ code: String) -> Double? {

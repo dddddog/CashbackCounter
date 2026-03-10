@@ -64,9 +64,10 @@ struct CurrencyService {
         print("🌍 正在联网更新汇率 (base: \(base))...")
         do {
             let rates = try await fetchRemoteRates(base: base)
+            let normalized = normalizedRates(rates)
             // 下载成功后，立刻存入本地
-            saveRatesLocally(rates, base: base)
-            return rates
+            saveRatesLocally(normalized, base: base)
+            return normalized
         } catch {
             print("❌ 网络请求失败: \(error)")
             if let cached = loadLocalRates(), cached.base.caseInsensitiveCompare(base) == .orderedSame {
@@ -88,8 +89,9 @@ struct CurrencyService {
 
     // --- 内部方法：存入 UserDefaults ---
     private static func saveRatesLocally(_ rates: [String: Double], base: String) {
+        let normalized = normalizedRates(rates)
         // 1. 存汇率 + 基准币种
-        let cached = CachedRates(base: base, rates: rates)
+        let cached = CachedRates(base: base, rates: normalized)
         if let data = try? JSONEncoder().encode(cached) {
             UserDefaults.standard.set(data, forKey: kRatesKey)
         }
@@ -103,14 +105,27 @@ struct CurrencyService {
     private static func loadLocalRates() -> CachedRates? {
         guard let data = UserDefaults.standard.data(forKey: kRatesKey) else { return nil }
         if let cached = try? JSONDecoder().decode(CachedRates.self, from: data) {
-            return cached
+            return CachedRates(base: cached.base, rates: normalizedRates(cached.rates))
         }
         // 兼容旧版本缓存（仅存汇率字典）
         if let rates = try? JSONDecoder().decode([String: Double].self, from: data),
            let base = UserDefaults.standard.string(forKey: kBaseKey) {
-            return CachedRates(base: base, rates: rates)
+            return CachedRates(base: base, rates: normalizedRates(rates))
         }
         return nil
+    }
+
+    // 统一大小写，避免汇率字典 key 大小写不一致导致换算失败
+    private static func normalizedRates(_ rates: [String: Double]) -> [String: Double] {
+        var normalized: [String: Double] = [:]
+        normalized.reserveCapacity(rates.count * 2)
+        for (code, value) in rates {
+            let upper = code.uppercased()
+            let lower = code.lowercased()
+            normalized[upper] = value
+            normalized[lower] = value
+        }
+        return normalized
     }
     
 }
