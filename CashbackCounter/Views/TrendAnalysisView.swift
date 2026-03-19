@@ -42,6 +42,7 @@ struct TrendAnalysisView: View {
     let type: TrendType
     
     @State private var selectedCard: CreditCard? = nil
+    @State private var selectedDate: Date? = nil
 
     private func exchangeRate(for currencyCode: String) -> Double {
         if currencyCode == mainCurrencyCode { return 1.0 }
@@ -106,6 +107,43 @@ struct TrendAnalysisView: View {
         }
         return data.reversed()
     }
+
+    private var totalAmount: Double {
+        chartData.reduce(0) { $0 + $1.amount }
+    }
+
+    private var monthRangeText: String {
+        guard let start = chartData.first?.date, let end = chartData.last?.date else {
+            return ""
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale.current
+        formatter.dateFormat = "yyyy/MM"
+        return "\(formatter.string(from: start)) - \(formatter.string(from: end))"
+    }
+
+    private var highlightedData: MonthlyData? {
+        if let selectedDate {
+            return chartData.min(by: {
+                abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate))
+            })
+        }
+        return chartData.last
+    }
+
+    private func formattedCurrency(_ amount: Double) -> String {
+        amount.formatted(.currency(code: mainCurrencyCode))
+    }
+
+    private func axisLabel(for date: Date) -> String {
+        let calendar = Calendar.current
+        let month = calendar.component(.month, from: date)
+        if month == 1 {
+            return date.formatted(.dateTime.year().month(.abbreviated))
+        }
+        return date.formatted(.dateTime.month(.abbreviated))
+    }
     
     var body: some View {
         NavigationView {
@@ -130,67 +168,120 @@ struct TrendAnalysisView: View {
                     }
                     
                     // 动态颜色
-                    Text("近12个月累计: \(chartData.reduce(0){ $0 + $1.amount }.formatted(.currency(code: mainCurrencyCode)))")
+                    Text("近12个月累计: \(formattedCurrency(totalAmount))")
                         .font(.title2)
                         .fontWeight(.bold)
                         .padding(.horizontal)
                         .foregroundColor(type.color) // 👇 使用类型颜色
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 4)
+
+                    if !monthRangeText.isEmpty {
+                        Text("范围: \(monthRangeText)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                    }
                     
-                    Chart(chartData) { item in
-                        // 线条
-                        LineMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(type.color) // 👇 使用类型颜色
-                        .lineStyle(StrokeStyle(lineWidth: 3))
-                        
-                        // 渐变填充
-                        AreaMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [type.color.opacity(0.3), type.color.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                    Chart {
+                        ForEach(chartData) { item in
+                            // 线条
+                            LineMark(
+                                x: .value("月份", item.date, unit: .month),
+                                y: .value("金额", item.amount)
                             )
-                        )
-                        
-                        // 数据点
-                        PointMark(
-                            x: .value("月份", item.date, unit: .month),
-                            y: .value("金额", item.amount)
-                        )
-                        .foregroundStyle(.white)
-                        .symbolSize(60)
-                        .annotation(position: .top) {
-                            if item.amount > 0 {
-                                Text("\(Int(item.amount))")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.primary.opacity(0.7))
-                                    .padding(.bottom, 4)
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(type.color) // 👇 使用类型颜色
+                            .lineStyle(StrokeStyle(lineWidth: 3))
+                            
+                            // 渐变填充
+                            AreaMark(
+                                x: .value("月份", item.date, unit: .month),
+                                y: .value("金额", item.amount)
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [type.color.opacity(0.3), type.color.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            
+                            // 数据点
+                            PointMark(
+                                x: .value("月份", item.date, unit: .month),
+                                y: .value("金额", item.amount)
+                            )
+                            .foregroundStyle(type.color)
+                            .symbolSize(40)
+                        }
+
+                        if let highlighted = highlightedData {
+                            RuleMark(
+                                x: .value("选中月份", highlighted.date, unit: .month)
+                            )
+                            .foregroundStyle(.secondary.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+
+                            PointMark(
+                                x: .value("月份", highlighted.date, unit: .month),
+                                y: .value("金额", highlighted.amount)
+                            )
+                            .symbolSize(90)
+                            .foregroundStyle(type.color)
+                            .annotation(position: .top, alignment: .leading) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(highlighted.date, format: .dateTime.year().month())
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(formattedCurrency(highlighted.amount))
+                                        .font(.caption.bold())
+                                        .foregroundColor(.primary)
+                                }
+                                .padding(8)
+                                .background(.regularMaterial)
+                                .cornerRadius(8)
                             }
                         }
                     }
                     .frame(height: 260)
                     .padding(.horizontal)
                     .padding(.bottom, 16)
-                    // X轴：保持你喜欢的自动间隔
-                    .chartXAxis {
-                        AxisMarks { value in
-                            AxisValueLabel(format: .dateTime.month(), centered: true)
-                                .font(.system(size: 14, weight: .medium))
+                    .chartOverlay { proxy in
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .fill(Color.clear)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            guard let plotFrame = proxy.plotFrame else { return }
+                                            let frame = geometry[plotFrame]
+                                            let x = value.location.x - frame.origin.x
+                                            guard x >= 0, x <= frame.size.width else { return }
+                                            if let date: Date = proxy.value(atX: x) {
+                                                selectedDate = date
+                                            }
+                                        }
+                                )
                         }
                     }
-                    // Y轴
+                    // X轴：跨年时显示年份
+                    .chartXAxis {
+                        AxisMarks(values: chartData.map { $0.date }) { value in
+                            AxisTick()
+                            if let date = value.as(Date.self) {
+                                AxisValueLabel {
+                                    Text(axisLabel(for: date))
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                            }
+                        }
+                    }
+                    // Y轴：统一币种格式
                     .chartYAxis {
-                        AxisMarks { value in
+                        AxisMarks { _ in
                             AxisGridLine()
-                            AxisValueLabel()
+                            AxisValueLabel(format: .currency(code: mainCurrencyCode))
                                 .font(.system(size: 13))
                         }
                     }

@@ -186,6 +186,7 @@
       }
     },
     "%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -206,6 +207,9 @@
           }
         }
       }
+    },
+    "%lld 个计划" : {
+
     },
     "• 分享导出：仅当你主动使用“导出”功能时，数据才会通过系统导出面板离开应用。" : {
       "localizations" : {
@@ -2470,7 +2474,11 @@
         }
       }
     },
+    "总等值价值" : {
+
+    },
     "总等值价值（预估）" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2540,6 +2548,9 @@
         }
       }
     },
+    "手动添加" : {
+
+    },
     "手动添加积分" : {
       "localizations" : {
         "en" : {
@@ -2593,6 +2604,9 @@
           }
         }
       }
+    },
+    "按 %@ 计价" : {
+
     },
     "按年" : {
       "localizations" : {
@@ -2819,6 +2833,9 @@
           }
         }
       }
+    },
+    "新台币（TWD）" : {
+
     },
     "新增积分计划" : {
       "localizations" : {
@@ -3395,6 +3412,9 @@
         }
       }
     },
+    "欧元（EUR）" : {
+
+    },
     "正在下载卡面..." : {
       "localizations" : {
         "en" : {
@@ -3480,6 +3500,9 @@
           }
         }
       }
+    },
+    "汇率获取中" : {
+
     },
     "浅色模式" : {
       "localizations" : {
@@ -3673,6 +3696,9 @@
         }
       }
     },
+    "添加积分计划" : {
+
+    },
     "清除" : {
       "localizations" : {
         "en" : {
@@ -3748,6 +3774,9 @@
           }
         }
       }
+    },
+    "澳门币（MOP)" : {
+
     },
     "版本" : {
       "localizations" : {
@@ -4150,6 +4179,7 @@
       }
     },
     "约合 ..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4166,6 +4196,7 @@
       }
     },
     "约合 %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4435,6 +4466,12 @@
           }
         }
       }
+    },
+    "英镑（GBP）" : {
+
+    },
+    "范围: %@" : {
+
     },
     "解析中..." : {
       "localizations" : {
@@ -4906,6 +4943,9 @@
         }
       }
     },
+    "选中月份" : {
+
+    },
     "选择信用卡" : {
       "localizations" : {
         "en" : {
@@ -5167,6 +5207,9 @@
           }
         }
       }
+    },
+    "预估" : {
+
     },
     "预计积分价值" : {
       "localizations" : {

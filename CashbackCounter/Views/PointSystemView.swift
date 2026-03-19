@@ -78,43 +78,99 @@ struct PointSystemView: View {
 
     @ViewBuilder
     private func dashboardHeader(totalValue: Double) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("总等值价值（预估）")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("总等值价值")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Text(isRatesReady ? formattedNumber(totalValue) : "...")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .minimumScaleFactor(0.6)
-
-                Text(isRatesReady ? "约合 \(formattedCurrency(totalValue))" : "约合 ...")
-                    .font(.footnote)
+                Text("预估")
+                    .font(.caption2.weight(.semibold))
                     .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.primary.opacity(0.08))
+                    )
+
+                Spacer()
+
+                Image(systemName: "star.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
 
+            Text(isRatesReady ? formattedCurrency(totalValue) : "...")
+                .font(.system(size: 38, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.6)
+                .monospacedDigit()
+
+            HStack(spacing: 8) {
+                if isRatesReady {
+                    Text("按 \(mainCurrencyCode) 计价")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("汇率获取中")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .cardSurface(cornerRadius: 22, tint: .accentColor)
     }
 
     @ViewBuilder
     private func pointCardSection(summaries: [PointProgramSummary]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("积分卡片")
-                .font(.headline)
-                .padding(.horizontal, 4)
+            HStack {
+                Text("积分卡片")
+                    .font(.headline)
+
+                Spacer()
+
+                if !summaries.isEmpty {
+                    Text("\(summaries.count) 个计划")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
 
             if summaries.isEmpty {
-                ContentUnavailableView(
-                    "暂无积分记录",
-                    systemImage: "star.circle",
-                    description: Text("新增积分返现交易后，这里会显示累计积分")
-                )
+                VStack(spacing: 12) {
+                    ContentUnavailableView(
+                        "暂无积分记录",
+                        systemImage: "star.circle",
+                        description: Text("新增积分返现交易后，这里会显示累计积分")
+                    )
+
+                    HStack(spacing: 12) {
+                        Button(action: { showPointLibrary = true }) {
+                            Label("添加积分计划", systemImage: "star.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button(action: { showPointAdjustment = true }) {
+                            Label("手动添加", systemImage: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity)
                 .padding(.top, 24)
             } else {
                 LazyVStack(spacing: 12) {
@@ -230,14 +286,6 @@ struct PointSystemView: View {
         return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }
 
-    private func formattedNumber(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-    }
-
     private func formattedCurrency(_ value: Double) -> String {
         value.formatted(.currency(code: mainCurrencyCode))
     }
@@ -258,6 +306,43 @@ struct PointSystemView: View {
 
     private func rateForCurrency(_ code: String) -> Double? {
         exchangeRates[code.lowercased()] ?? exchangeRates[code]
+    }
+}
+
+private struct CardSurface: ViewModifier {
+    let cornerRadius: CGFloat
+    let tint: Color?
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
+
+                    if let tint {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [tint.opacity(0.18), tint.opacity(0.0)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+    }
+}
+
+private extension View {
+    func cardSurface(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
+        modifier(CardSurface(cornerRadius: cornerRadius, tint: tint))
     }
 }
 
@@ -284,10 +369,14 @@ private struct PointSummaryCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(summary.bankName)
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 if !summary.pointName.isEmpty {
                     Text(summary.pointName)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
 
@@ -297,10 +386,15 @@ private struct PointSummaryCard: View {
                 Text(pointsText)
                     .font(.title3.weight(.bold))
                     .foregroundColor(.primary)
+                    .monospacedDigit()
                 Text("积分")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary.opacity(0.8))
         }
         .padding(16)
         .background(cardBackground)
@@ -309,7 +403,7 @@ private struct PointSummaryCard: View {
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
         .cornerRadius(18)
-        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
+        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
     }
 
     private var cardBackground: some View {
@@ -346,7 +440,7 @@ private struct PointLogoPlaceholder: View {
                     )
                 )
 
-            Text(String(bankName.prefix(1)))
+            Text(String(bankName.prefix(1)).uppercased())
                 .font(.headline)
                 .foregroundColor(.white)
         }
@@ -412,6 +506,7 @@ private struct PointDetailView: View {
                         .foregroundColor(.secondary)
                     Text(formattedPoints(totalPoints))
                         .font(.title2.weight(.bold))
+                        .monospacedDigit()
                 }
 
                 Spacer()
@@ -422,14 +517,12 @@ private struct PointDetailView: View {
                         .foregroundColor(.secondary)
                     Text(isRatesReady ? formattedCurrency(estimatedValue, code: mainCurrencyCode) : "...")
                         .font(.title3.weight(.semibold))
+                        .monospacedDigit()
                 }
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .cardSurface(cornerRadius: 16, tint: accentColor)
     }
 
     private var chartCard: some View {
@@ -439,6 +532,7 @@ private struct PointDetailView: View {
             Text("净变化：\(formattedPoints(netPoints)) 积分")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .monospacedDigit()
 
             Chart(chartData) { item in
                 LineMark(
@@ -484,10 +578,7 @@ private struct PointDetailView: View {
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .cardSurface(cornerRadius: 16)
     }
 
     private var relatedTransactions: [Transaction] {

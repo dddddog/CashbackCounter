@@ -106,6 +106,10 @@ struct SettingsView: View {
                         Text("美元 (USD)").tag("USD")
                         Text("港币 (HKD)").tag("HKD")
                         Text("日元 (JPY)").tag("JPY")
+                        Text("澳门币（MOP)").tag("MOP")
+                        Text("欧元（EUR）").tag("EUR")
+                        Text("英镑（GBP）").tag("GBP")
+                        Text("新台币（TWD）").tag("TWD")
                     }
                     
                     NavigationLink(destination: NotificationSettingsView()) {
