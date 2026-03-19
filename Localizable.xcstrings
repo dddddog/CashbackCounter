@@ -185,29 +185,6 @@
         }
       }
     },
-    "%lld" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld"
-          }
-        }
-      }
-    },
     "%lld 个计划" : {
 
     },
@@ -245,23 +222,6 @@
     },
     "• 更新前建议使用“全部数据导出”进行备份！！！（重要）。" : {
 
-    },
-    "• 更新前建议使用“全部数据导出”进行备份！！（重要）。" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• Before updating, we recommend using \"Export All Data\" for backup!! (Important)."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• 更新前建議使用「全部數據導出」進行備份！！（重要）。"
-          }
-        }
-      }
     },
     "• 更新后首次打开可能需要短暂时间完成数据整理。" : {
       "localizations" : {
@@ -541,23 +501,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "English"
-          }
-        }
-      }
-    },
-    "iCloud 同步 (功能正在开发中)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud Sync (Developing)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 同步 (功能正在開發中)"
           }
         }
       }
@@ -1133,29 +1076,6 @@
         }
       }
     },
-    "价值与兑换" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Value & Redemption"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "价值与兑换"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "價值與兌換"
-          }
-        }
-      }
-    },
     "价值与币种" : {
       "localizations" : {
         "en" : {
@@ -1188,6 +1108,22 @@
         }
       }
     },
+    "你的智能返现计算助手，轻松管理你的消费。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your smart cashback assistant for effortless spending management."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的智能返现计算助手，轻松管理你的消费。"
+          }
+        }
+      }
+    },
     "保存" : {
       "localizations" : {
         "en" : {
@@ -1206,75 +1142,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "儲存"
-          }
-        }
-      }
-    },
-    "值" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Value"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "值"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "值"
-          }
-        }
-      }
-    },
-    "兑换比例" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Redemption Ratio"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兑换比例"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兌換比例"
-          }
-        }
-      }
-    },
-    "兑换比例: %@ 积分 = 1 %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Redemption: %@ points = 1 %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兑换比例: %@ 积分 = 1 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兌換比例：%@ 積分 = 1 %@"
           }
         }
       }
@@ -1637,6 +1504,22 @@
         }
       }
     },
+    "卡包管理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Card Management"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卡包管理"
+          }
+        }
+      }
+    },
     "卡种 (如: 运通白金)" : {
       "localizations" : {
         "en" : {
@@ -1791,161 +1674,6 @@
         }
       }
     },
-    "基础积分 (所有消费)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base Points (All Spend)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基础积分 (所有消费)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基礎積分（所有消費）"
-          }
-        }
-      }
-    },
-    "基础返现 (所有消费)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base cashback (all purchases)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基础返现 (所有消费)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基礎返現 (所有消費)"
-          }
-        }
-      }
-    },
-    "外币%@上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Foreign %@ Total"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外幣%@上限"
-          }
-        }
-      }
-    },
-    "外币年积分上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Foreign Yearly Points Cap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外币年积分上限"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外幣年積分上限"
-          }
-        }
-      }
-    },
-    "外币月积分上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Foreign Monthly Points Cap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外币月积分上限"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外幣月積分上限"
-          }
-        }
-      }
-    },
-    "外币积分率 (%)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Foreign Points Rate (%)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外币积分率 (%)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外幣積分率 (%)"
-          }
-        }
-      }
-    },
-    "外币返现率 (%)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Foreign currency cashback rate (%)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外币返现率 (%)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外幣返現率 (%)"
-          }
-        }
-      }
-    },
     "外观与语言" : {
       "localizations" : {
         "en" : {
@@ -2008,6 +1736,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "實際扣款"
+          }
+        }
+      }
+    },
+    "导入 CSV 或 ZIP 备份，上传结单 PDF 自动对账。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import CSV or ZIP backups and upload statement PDFs for automatic reconciliation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入 CSV 或 ZIP 备份，上传结单 PDF 自动对账。"
           }
         }
       }
@@ -2106,6 +1850,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "導入帳單"
+          }
+        }
+      }
+    },
+    "导入账单与结单识别" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Bills & Statement Recognition"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入账单与结单识别"
           }
         }
       }
@@ -2224,23 +1984,6 @@
         }
       }
     },
-    "尝试更换关键词或检查筛选条件" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Try changing keywords or check the filters"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "嘗試更換關鍵詞或檢查篩選條件"
-          }
-        }
-      }
-    },
     "尾号 (后四位)" : {
       "localizations" : {
         "en" : {
@@ -2317,29 +2060,6 @@
         }
       }
     },
-    "币种 (如: CNY)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Currency (e.g. CNY)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "币种 (如: CNY)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "幣種（如：CNY）"
-          }
-        }
-      }
-    },
     "常规" : {
       "localizations" : {
         "en" : {
@@ -2358,6 +2078,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "常規"
+          }
+        }
+      }
+    },
+    "建议在更新版本前，提前在设置页将全部数据导出并保存，以免出现问题" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before updating, we recommend exporting and saving all data in Settings to avoid issues."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建议在更新版本前，提前在设置页将全部数据导出并保存，以免出现问题"
           }
         }
       }
@@ -2406,6 +2142,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟後，將在每月還款日上午 9:00 推送提醒。"
+          }
+        }
+      }
+    },
+    "开始使用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get Started"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始使用"
           }
         }
       }
@@ -2476,23 +2228,6 @@
     },
     "总等值价值" : {
 
-    },
-    "总等值价值（预估）" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total Equivalent Value (Estimated)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "總等值價值（預估）"
-          }
-        }
-      }
     },
     "总返现" : {
       "localizations" : {
@@ -2601,6 +2336,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拍一筆"
+          }
+        }
+      }
+    },
+    "拍一笔，快速记账" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snap and Log Fast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拍一笔，快速记账"
+          }
+        }
+      }
+    },
+    "拍照或手动输入，快速记录每一笔消费。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take a photo or enter manually to quickly record every purchase."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拍照或手动输入，快速记录每一笔消费。"
           }
         }
       }
@@ -3075,29 +2842,6 @@
         }
       }
     },
-    "暂无账单" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No bills yet"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暂无账单"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暫無帳單"
-          }
-        }
-      }
-    },
     "更新注意事项" : {
       "localizations" : {
         "en" : {
@@ -3146,6 +2890,22 @@
         }
       }
     },
+    "更新须知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update Notes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新须知"
+          }
+        }
+      }
+    },
     "月份" : {
       "localizations" : {
         "en" : {
@@ -3164,23 +2924,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "月份"
-          }
-        }
-      }
-    },
-    "未找到结果" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No results found"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到結果"
           }
         }
       }
@@ -3219,115 +2962,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未選擇"
-          }
-        }
-      }
-    },
-    "本币%@上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Currency %@ Total"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本幣￼%@上限"
-          }
-        }
-      }
-    },
-    "本币年积分上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local Yearly Points Cap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本币年积分上限"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本幣年積分上限"
-          }
-        }
-      }
-    },
-    "本币月积分上限" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local Monthly Points Cap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本币月积分上限"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本幣月積分上限"
-          }
-        }
-      }
-    },
-    "本币积分率 (%)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local Points Rate (%)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本币积分率 (%)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本幣積分率 (%)"
-          }
-        }
-      }
-    },
-    "本币返现率 (%)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local currency cashback rate (%)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本币返现率 (%)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本幣返現率 (%)"
           }
         }
       }
@@ -3408,6 +3042,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "鬆手導入圖片"
+          }
+        }
+      }
+    },
+    "查看支出趋势与积分进度，让消费更有方向。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View spending trends and points progress to keep your spending on track."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看支出趋势与积分进度，让消费更有方向。"
+          }
+        }
+      }
+    },
+    "欢迎使用Cashback Counter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome to Cashback Counter"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎使用Cashback Counter"
           }
         }
       }
@@ -3680,6 +3346,22 @@
         }
       }
     },
+    "添加信用卡，配置返现/积分规则，随时查看卡片详情。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add credit cards, set cashback/points rules, and view card details anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加信用卡，配置返现/积分规则，随时查看卡片详情。"
+          }
+        }
+      }
+    },
     "添加收入" : {
       "localizations" : {
         "en" : {
@@ -3920,29 +3602,6 @@
         }
       }
     },
-    "积分上限周期" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points Cap Period"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "积分上限周期"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "積分上限週期"
-          }
-        }
-      }
-    },
     "积分价值" : {
       "localizations" : {
         "en" : {
@@ -4021,29 +3680,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "積分庫"
-          }
-        }
-      }
-    },
-    "积分数" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points Earned"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "积分数"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "積分數"
           }
         }
       }
@@ -4178,57 +3814,6 @@
         }
       }
     },
-    "约合 ..." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approx. ..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "約合 ..."
-          }
-        }
-      }
-    },
-    "约合 %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approx. %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "約合 %@"
-          }
-        }
-      }
-    },
-    "结单" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Statement"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "結單"
-          }
-        }
-      }
-    },
     "结单分析" : {
       "localizations" : {
         "en" : {
@@ -4257,6 +3842,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結單卡"
+          }
+        }
+      }
+    },
+    "继续" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
           }
         }
       }
@@ -4807,6 +4408,22 @@
         }
       }
     },
+    "趋势与积分" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trends & Points"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "趋势与积分"
+          }
+        }
+      }
+    },
     "跟随系统" : {
       "localizations" : {
         "en" : {
@@ -4825,6 +4442,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跟隨系統"
+          }
+        }
+      }
+    },
+    "跳过" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
           }
         }
       }
@@ -4857,40 +4490,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近12個月累計: %@"
-          }
-        }
-      }
-    },
-    "返 %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cashback %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返 %@"
-          }
-        }
-      }
-    },
-    "返现上限周期" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total Cashback Term"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返現上限週期"
           }
         }
       }

@@ -6,6 +6,7 @@ struct ContentView: View {
     // 选中的 Tab 索引
     @State private var selectedTab = 0
     @Environment(\.modelContext) private var context
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     
     var body: some View {
         // TabView 是底部导航栏的核心容器
@@ -19,20 +20,17 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            
-            // --- 中间：拍照/记账页 ---
-            CameraRecordView()
-                .tabItem {
-                    Image(systemName: "camera.circle.fill") // 大圆圈图标
-                    Text("拍一笔")
-                }
-                .tag(1)
-            
-            // --- 右边：信用卡页 ---
             CardListView()
                 .tabItem {
                     Image(systemName: selectedTab == 2 ? "creditcard.fill" : "creditcard")
                     Text("卡包")
+                }
+                .tag(1)
+            
+            CameraRecordView()
+                .tabItem {
+                    Image(systemName: "camera.circle.fill") // 大圆圈图标
+                    Text("拍一笔")
                 }
                 .tag(2)
             
@@ -59,6 +57,20 @@ struct ContentView: View {
                 try Point.syncDefaultPoints(in: context)
             } catch {
                 print("Failed to sync point templates: \(error)")
+            }
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { !hasSeenOnboarding },
+                set: { newValue in
+                    if !newValue {
+                        hasSeenOnboarding = true
+                    }
+                }
+            )
+        ) {
+            OnboardingView {
+                hasSeenOnboarding = true
             }
         }
     }

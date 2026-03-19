@@ -21,8 +21,8 @@ struct CashbackCounterApp: App { // 2. 这个结构体必须遵守 App 协议
     var body: some Scene {
         WindowGroup {
             ContentView()
-            .preferredColorScheme(userTheme == 1 ? .light : (userTheme == 2 ? .dark : nil))
-            .environment(\.locale, userLanguage == "system" ? .current : Locale(identifier: userLanguage))
+                .preferredColorScheme(userTheme == 1 ? .light : (userTheme == 2 ? .dark : nil))
+                .environment(\.locale, userLanguage == "system" ? .current : Locale(identifier: userLanguage))
 
         }
         .modelContainer(for: [Transaction.self, CreditCard.self, CardTemplate.self, Income.self, Point.self, PointAdjustment.self])
