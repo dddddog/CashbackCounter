@@ -57,7 +57,12 @@ extension Point {
         PointSeed(bankName: "HSBC US", pointName: "Point", pointValue: 0.015, valueCurrencyCode: .us),
         PointSeed(bankName: "Chase", pointName: "UR", pointValue: 0.015, valueCurrencyCode: .us),
         PointSeed(bankName: "AMEX HK", pointName: "MR", pointValue: 0.0056, valueCurrencyCode: .hk),
-        PointSeed(bankName: "AMEX US", pointName: "MR", pointValue: 0.016, valueCurrencyCode: .us)
+        PointSeed(bankName: "AMEX US", pointName: "MR", pointValue: 0.016, valueCurrencyCode: .us),
+        PointSeed(bankName: "Marriott", pointName: "Point", pointValue: 0.007, valueCurrencyCode: .us),
+        PointSeed(bankName: "Hilton", pointName: "Point", pointValue: 0.004, valueCurrencyCode: .us),
+
+
+        
     ]
 
     static func syncDefaultPoints(in context: ModelContext) throws {

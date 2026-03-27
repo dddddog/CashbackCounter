@@ -1108,22 +1108,6 @@
         }
       }
     },
-    "你的智能返现计算助手，轻松管理你的消费。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your smart cashback assistant for effortless spending management."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的智能返现计算助手，轻松管理你的消费。"
-          }
-        }
-      }
-    },
     "保存" : {
       "localizations" : {
         "en" : {
@@ -1504,22 +1488,6 @@
         }
       }
     },
-    "卡包管理" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Card Management"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "卡包管理"
-          }
-        }
-      }
-    },
     "卡种 (如: 运通白金)" : {
       "localizations" : {
         "en" : {
@@ -1740,22 +1708,6 @@
         }
       }
     },
-    "导入 CSV 或 ZIP 备份，上传结单 PDF 自动对账。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import CSV or ZIP backups and upload statement PDFs for automatic reconciliation."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入 CSV 或 ZIP 备份，上传结单 PDF 自动对账。"
-          }
-        }
-      }
-    },
     "导入卡片" : {
       "localizations" : {
         "en" : {
@@ -1850,22 +1802,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "導入帳單"
-          }
-        }
-      }
-    },
-    "导入账单与结单识别" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Bills & Statement Recognition"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入账单与结单识别"
           }
         }
       }
@@ -2078,22 +2014,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "常規"
-          }
-        }
-      }
-    },
-    "建议在更新版本前，提前在设置页将全部数据导出并保存，以免出现问题" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Before updating, we recommend exporting and saving all data in Settings to avoid issues."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "建议在更新版本前，提前在设置页将全部数据导出并保存，以免出现问题"
           }
         }
       }
@@ -2336,38 +2256,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拍一筆"
-          }
-        }
-      }
-    },
-    "拍一笔，快速记账" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snap and Log Fast"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拍一笔，快速记账"
-          }
-        }
-      }
-    },
-    "拍照或手动输入，快速记录每一笔消费。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Take a photo or enter manually to quickly record every purchase."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拍照或手动输入，快速记录每一笔消费。"
           }
         }
       }
@@ -2890,22 +2778,6 @@
         }
       }
     },
-    "更新须知" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Update Notes"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新须知"
-          }
-        }
-      }
-    },
     "月份" : {
       "localizations" : {
         "en" : {
@@ -3042,38 +2914,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "鬆手導入圖片"
-          }
-        }
-      }
-    },
-    "查看支出趋势与积分进度，让消费更有方向。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View spending trends and points progress to keep your spending on track."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看支出趋势与积分进度，让消费更有方向。"
-          }
-        }
-      }
-    },
-    "欢迎使用Cashback Counter" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Welcome to Cashback Counter"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "欢迎使用Cashback Counter"
           }
         }
       }
@@ -3342,22 +3182,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加信用卡"
-          }
-        }
-      }
-    },
-    "添加信用卡，配置返现/积分规则，随时查看卡片详情。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add credit cards, set cashback/points rules, and view card details anytime."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加信用卡，配置返现/积分规则，随时查看卡片详情。"
           }
         }
       }
@@ -4404,22 +4228,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "賺 %@"
-          }
-        }
-      }
-    },
-    "趋势与积分" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trends & Points"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "趋势与积分"
           }
         }
       }
