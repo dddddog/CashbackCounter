@@ -47,7 +47,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
         // 核心字段检查
         guard let merchant = metadata.merchant,
               let amount = metadata.totalAmount,
-              let detectedRegion = OCRService.simpleInferRegion(from: textToParse),
+              let detectedRegion = metadata.currency,
               let category = metadata.category else {
             throw NSError(domain: "AddTransactionFromSMSIntent", code: 1, userInfo: [NSLocalizedDescriptionKey: "缺少商户、金额或类别信息"])
         }
@@ -64,6 +64,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
         case let code where code?.contains("JPY") == true: region = .jp
         case let code where code?.contains("NZD") == true: region = .nz
         case let code where code?.contains("TWD") == true: region = .tw
+        case let code where code?.contains("GBP") == true: region = .uk
         default:                                          region = .other
         }
 
@@ -107,7 +108,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
         let newTransaction = Transaction(
             merchant: merchant,
             category: category,
-            location: detectedRegion,
+            location: region,
             amount: amount,
             date: date,
             card: selectedCard,

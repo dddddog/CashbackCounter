@@ -38,6 +38,9 @@ struct SMSMetadata {
     @Guide(description: "The total amount paid (not contain deduction).")
     var totalAmount: Double? // ✅ 加上问号
     
+    @Guide(description: "The currency code (choice from those, CNY, USD, HKD, JPY, NZD, TWD, GBP, MOP, EUR).")
+    var currency: String?
+    
     @Guide(description: "The last 4 digits of the credit card used.")
     var cardLast4: String?   // ✅ 加上问号
     
