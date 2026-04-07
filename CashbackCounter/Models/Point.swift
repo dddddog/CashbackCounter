@@ -68,14 +68,42 @@ extension Point {
     ]
 
     static func syncDefaultPoints(in context: ModelContext) throws {
-        let descriptor = FetchDescriptor<Point>()
-        let currentPoints = try context.fetch(descriptor)
-        let currentMap = Dictionary(uniqueKeysWithValues: currentPoints.map { (templateKey(for: $0), $0) })
+            let descriptor = FetchDescriptor<Point>()
+            let currentPoints = try context.fetch(descriptor)
+            
+            // 改进 1：安全地构建字典，防止重复 Key 导致崩溃闪退
+            let currentMap = Dictionary(
+                currentPoints.map { (templateKey(for: $0), $0) },
+                uniquingKeysWith: { (existing, _) in existing } // 如果发现重复，保留已存在的第一条
+            )
 
-        for seed in defaultSeeds where currentMap[seed.templateKey] == nil {
-            context.insert(seed.makeModel())
+            var hasChanges = false
+
+            for seed in defaultSeeds {
+                let key = seed.templateKey
+                
+                if let existingPoint = currentMap[key] {
+                    // 改进 2：业务逻辑扩展 - 同步默认值的更新（例如积分价值改变）
+                    // 如果 CashbackCounter 允许用户自定义修改这些默认积分的值，那么这里可能需要更复杂的判断
+                    // 但如果是纯只读的全局基准价值，应该用以下代码覆盖更新：
+                    if existingPoint.pointValue != seed.pointValue {
+                        existingPoint.pointValue = seed.pointValue
+                        hasChanges = true
+                    }
+                } else {
+                    // 改进 3：插入全新缺失的数据
+                    context.insert(seed.makeModel())
+                    hasChanges = true
+                }
+            }
+
+            // 改进 4：有实质性变更时才显式落盘，保证数据安全
+            if hasChanges {
+                if context.hasChanges {
+                    try context.save()
+                }
+            }
         }
-    }
 
     fileprivate static func templateKey(for point: Point) -> String {
         templateKey(
