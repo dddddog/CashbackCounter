@@ -55,6 +55,8 @@ extension Point {
     static let defaultSeeds: [PointSeed] = [
         PointSeed(bankName: "HSBC HK", pointName: "RC", pointValue: 1.25, valueCurrencyCode: .hk),
         PointSeed(bankName: "HSBC US", pointName: "Point", pointValue: 0.015, valueCurrencyCode: .us),
+        PointSeed(bankName: "BEA HK", pointName: "Point", pointValue: 0.01, valueCurrencyCode: .hk),
+        PointSeed(bankName: "CCB HK", pointName: "Point", pointValue: 0.006, valueCurrencyCode: .hk),
         PointSeed(bankName: "Chase", pointName: "UR", pointValue: 0.015, valueCurrencyCode: .us),
         PointSeed(bankName: "AMEX HK", pointName: "MR", pointValue: 0.0056, valueCurrencyCode: .hk),
         PointSeed(bankName: "AMEX US", pointName: "MR", pointValue: 0.016, valueCurrencyCode: .us),

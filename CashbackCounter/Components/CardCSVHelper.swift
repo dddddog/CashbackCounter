@@ -5,7 +5,7 @@ import SwiftData
 struct CardCSVHelper {
     
     // 👇 1. 修改表头：末尾增加两列
-    static let header = "银行名称,卡种名称,尾号,颜色1(Hex),颜色2(Hex),地区(Code),本币返现率(%),外币返现率(%),本币上限,外币上限,餐饮加成(%),超市加成(%),出行加成(%),数码加成(%),其他加成(%),餐饮上限,超市上限,出行上限,数码上限,其他上限,上限周期(monthly/yearly),还款日,支付方式加成(代码:rate),支付方式上限(代码:cap),奖励类型,积分名称,积分银行,积分价值,积分币种"
+    static let header = "银行名称,卡种名称,尾号,颜色1(Hex),颜色2(Hex),地区(Code),本币返现率(%),外币返现率(%),本币上限,外币上限,餐饮加成(%),超市加成(%),出行加成(%),数码加成(%),其他加成(%),餐饮上限,超市上限,出行上限,数码上限,其他上限,上限周期(monthly/yearly),还款日,支付方式加成(代码:rate),支付方式上限(代码:cap),奖励类型,积分名称,积分银行"
     
     // MARK: - 导出逻辑 (生成字符串)
     static func generateCSV(from cards: [CreditCard]) -> String {
@@ -65,10 +65,9 @@ struct CardCSVHelper {
             let rewardTypeStr = card.rewardType.rawValue
             let pointName = card.pointProgram?.pointName ?? ""
             let pointBank = card.pointProgram?.bankName ?? ""
-            let pointValue = card.pointProgram != nil ? String(format: "%.6f", card.pointProgram?.pointValue ?? 0) : ""
-            let pointCurrency = card.pointProgram?.valueCurrencyCode.currencyCode ?? ""
+
             
-            let row = "\(bank),\(type),\(endNum),\(c1),\(c2),\(region),\(defRate),\(forRate),\(locCap),\(forCap),\(diningRate),\(groceryRate),\(travelRate),\(digitalRate),\(otherRate),\(diningCap),\(groceryCap),\(travelCap),\(digitalCap),\(otherCap),\(capPeriodStr),\(rDay),\(pmRatesStr),\(pmCapsStr),\(rewardTypeStr),\(pointName),\(pointBank),\(pointValue),\(pointCurrency)\n"
+            let row = "\(bank),\(type),\(endNum),\(c1),\(c2),\(region),\(defRate),\(forRate),\(locCap),\(forCap),\(diningRate),\(groceryRate),\(travelRate),\(digitalRate),\(otherRate),\(diningCap),\(groceryCap),\(travelCap),\(digitalCap),\(otherCap),\(capPeriodStr),\(rDay),\(pmRatesStr),\(pmCapsStr),\(rewardTypeStr),\(pointName),\(pointBank)\n"
             csvString.append(row)
         }
         return csvString
