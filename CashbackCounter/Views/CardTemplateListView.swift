@@ -19,9 +19,7 @@ struct CardTemplateListView: View {
 
     var body: some View {
         NavigationView {
-            List(templateManager.templates.sorted(by: { 
-                $0.bankName < $1.bankName || ($0.bankName == $1.bankName && $0.type < $1.type)
-            })) { item in
+            List(templateManager.templates) { item in
                 Button(action: {
                     // 👇 点击后，不直接保存，而是记录选了谁
                     selectedTemplate = item
@@ -54,9 +52,9 @@ struct CardTemplateListView: View {
                                 }
                             }
                             // 👉 分支 B: 如果是本地 Assets 图片
-                            // 使用 UIImage(named:) 检查图片是否存在，避免显示空白
-                            else if UIImage(named: urlStr) != nil {
-                                Image(urlStr) // 直接加载 Assets 图片
+                            // 使用 UIImage(named:) 检查图片是否存在并直接加载，避免重复查找
+                            else if let uiImage = UIImage(named: urlStr) {
+                                Image(uiImage: uiImage) // 直接加载 Assets 图片
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: 50, height: 32) // 保持相同的尺寸
