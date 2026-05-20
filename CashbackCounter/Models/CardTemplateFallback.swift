@@ -626,6 +626,44 @@ let defaultCardTemplatesJSON = """
       "dining",
       300
     ],
+    "pictureURL" : "amexushonor",
+    "type" : "Honors",
+    "foreignBaseCap" : 0,
+    "localBaseCap" : 0,
+    "categoryCaps" : [
+
+    ],
+    "rewardType" : "points",
+    "pointProgramKey" : "hilton|point|usd",
+    "region" : "美国",
+    "paymentCaps" : [
+
+    ],
+    "colors" : [
+      "161D3A",
+      "5A97D1"
+    ],
+    "foreignCurrencyRate" : 300,
+    "paymentMethodRates" : [
+
+    ],
+    "bankName" : "AMEX US",
+    "defaultRate" : 300
+  },
+  {
+    "capPeriod" : {
+      "yearly" : {
+
+      }
+    },
+    "specialRate" : [
+      "other",
+      400,
+      "grocery",
+      200,
+      "dining",
+      200
+    ],
     "pictureURL" : "amexusaspire",
     "type" : "Surpass",
     "foreignBaseCap" : 0,
