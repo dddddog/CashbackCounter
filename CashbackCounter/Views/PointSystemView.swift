@@ -13,14 +13,11 @@ struct PointSystemView: View {
     private var cards: [CreditCard]
 
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
-    @State private var exchangeRates: [String: Double] = [:]
-    @State private var showPointLibrary = false
-    @State private var showPointAdjustment = false
-    @State private var showPointRemoval = false
+    @State private var viewModel = PointSystemViewModel()
 
     var body: some View {
-        let summaries = pointSummaries
-        let totalValue = totalEstimatedValue(for: summaries)
+        let summaries = viewModel.pointSummaries(transactions: transactions, adjustments: adjustments, cards: cards)
+        let totalValue = viewModel.totalEstimatedValue(for: summaries, mainCurrencyCode: mainCurrencyCode)
 
         NavigationView {
             ZStack {
@@ -43,13 +40,13 @@ struct PointSystemView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button(action: { showPointLibrary = true }) {
+                        Button(action: { viewModel.showPointLibrary = true }) {
                             Label("积分库", systemImage: "star.circle")
                         }
-                        Button(action: { showPointAdjustment = true }) {
+                        Button(action: { viewModel.showPointAdjustment = true }) {
                             Label("手动添加积分", systemImage: "plus")
                         }
-                        Button(action: { showPointRemoval = true }) {
+                        Button(action: { viewModel.showPointRemoval = true }) {
                             Label("手动移除积分", systemImage: "minus")
                         }
                     } label: {
@@ -59,20 +56,20 @@ struct PointSystemView: View {
                 }
             }
         }
-        .sheet(isPresented: $showPointLibrary) {
+        .sheet(isPresented: $viewModel.showPointLibrary) {
             PointLibraryView()
         }
-        .sheet(isPresented: $showPointAdjustment) {
+        .sheet(isPresented: $viewModel.showPointAdjustment) {
             PointAdjustmentEntryView()
         }
-        .sheet(isPresented: $showPointRemoval) {
+        .sheet(isPresented: $viewModel.showPointRemoval) {
             PointRemovalEntryView()
         }
         .task {
-            await refreshRates()
+            await viewModel.refreshRates(mainCurrencyCode: mainCurrencyCode)
         }
         .onChange(of: mainCurrencyCode) { _, _ in
-            Task { await refreshRates() }
+            Task { await viewModel.refreshRates(mainCurrencyCode: mainCurrencyCode) }
         }
     }
 
@@ -107,13 +104,13 @@ struct PointSystemView: View {
                     )
             }
 
-            Text(isRatesReady ? formattedCurrency(totalValue) : "...")
+            Text(viewModel.isRatesReady ? viewModel.formattedCurrency(totalValue, code: mainCurrencyCode) : "...")
                 .font(.system(size: 38, weight: .bold, design: .rounded))
                 .minimumScaleFactor(0.6)
                 .monospacedDigit()
 
             HStack(spacing: 8) {
-                if isRatesReady {
+                if viewModel.isRatesReady {
                     Text("按 \(mainCurrencyCode) 计价")
                         .font(.footnote)
                         .foregroundColor(.secondary)
@@ -159,12 +156,12 @@ struct PointSystemView: View {
                     )
 
                     HStack(spacing: 12) {
-                        Button(action: { showPointLibrary = true }) {
+                        Button(action: { viewModel.showPointLibrary = true }) {
                             Label("添加积分计划", systemImage: "star.circle")
                         }
                         .buttonStyle(.borderedProminent)
 
-                        Button(action: { showPointAdjustment = true }) {
+                        Button(action: { viewModel.showPointAdjustment = true }) {
                             Label("手动添加", systemImage: "plus")
                         }
                         .buttonStyle(.bordered)
@@ -180,13 +177,13 @@ struct PointSystemView: View {
                                 summary: summary,
                                 transactions: transactions,
                                 adjustments: adjustments,
-                                exchangeRates: exchangeRates,
+                                exchangeRates: viewModel.exchangeRates,
                                 mainCurrencyCode: mainCurrencyCode
                             )
                         } label: {
                             PointSummaryCard(
                                 summary: summary,
-                                pointsText: formattedPoints(summary.points)
+                                pointsText: viewModel.formattedPoints(summary.points)
                             )
                         }
                         .buttonStyle(.plain)
@@ -194,118 +191,6 @@ struct PointSystemView: View {
                 }
             }
         }
-    }
-
-    private func refreshRates() async {
-        let rates = await CurrencyService.getRates(base: mainCurrencyCode)
-        await MainActor.run {
-            exchangeRates = normalizeRates(rates)
-        }
-    }
-
-    private var pointSummaries: [PointProgramSummary] {
-        var totals: [String: Int] = [:]
-        var programs: [String: Point?] = [:]
-
-        for transaction in transactions {
-            let points = transaction.pointsEarned
-            guard points != 0 else { continue }
-
-            if let program = transaction.card?.pointProgram {
-                let key = program.id.uuidString
-                totals[key, default: 0] += points
-                programs[key] = program
-            } else {
-                let key = "unassigned"
-                totals[key, default: 0] += points
-                programs[key] = nil
-            }
-        }
-
-        for adjustment in adjustments {
-            guard adjustment.points != 0 else { continue }
-            guard let program = adjustment.pointProgram else { continue }
-            let key = program.id.uuidString
-            totals[key, default: 0] += adjustment.points
-            programs[key] = program
-        }
-
-        let pointCards = cards.filter { $0.rewardType == .points }
-        for card in pointCards {
-            if let program = card.pointProgram {
-                let key = program.id.uuidString
-                if totals[key] == nil {
-                    totals[key] = 0
-                    programs[key] = program
-                }
-            }
-        }
-
-        guard !totals.isEmpty else { return [] }
-
-        let cardMap = Dictionary(grouping: pointCards, by: { $0.pointProgram?.id.uuidString ?? "unassigned" })
-
-        return totals.map { key, points in
-            let program = programs[key] ?? nil
-            let card = cardMap[key]?.first
-            let colors = (card?.colors.count ?? 0) >= 2 ? (card?.colors ?? fallbackColors) : fallbackColors
-            let bankName = program?.bankName ?? "未分配"
-            let pointName = program?.pointName ?? "积分计划"
-
-            return PointProgramSummary(
-                id: key,
-                program: program,
-                bankName: bankName,
-                pointName: pointName,
-                points: points,
-                themeColors: colors
-            )
-        }
-        .sorted { $0.points > $1.points }
-    }
-
-    private func estimatedValue(for summary: PointProgramSummary) -> Double {
-        guard let program = summary.program, summary.points > 0 else { return 0 }
-        let value = Double(summary.points) * program.pointValue
-        return convertToMainCurrency(value, from: program.valueCurrencyCode.currencyCode)
-    }
-
-    private func totalEstimatedValue(for summaries: [PointProgramSummary]) -> Double {
-        summaries.reduce(0) { partial, summary in
-            partial + estimatedValue(for: summary)
-        }
-    }
-
-    private var isRatesReady: Bool {
-        !exchangeRates.isEmpty
-    }
-
-    private func formattedPoints(_ value: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: value)) ?? String(value)
-    }
-
-    private func formattedCurrency(_ value: Double) -> String {
-        value.formatted(.currency(code: mainCurrencyCode))
-    }
-
-    private func convertToMainCurrency(_ amount: Double, from currencyCode: String) -> Double {
-        guard currencyCode != mainCurrencyCode else { return amount }
-        guard let rate = rateForCurrency(currencyCode), rate > 0 else { return amount }
-        return amount / rate
-    }
-
-    private var fallbackColors: [Color] {
-        [Color.gray.opacity(0.35), Color.gray.opacity(0.15)]
-    }
-
-    private func normalizeRates(_ rates: [String: Double]) -> [String: Double] {
-        Dictionary(rates.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { _, new in new })
-    }
-
-    private func rateForCurrency(_ code: String) -> Double? {
-        exchangeRates[code.lowercased()] ?? exchangeRates[code]
     }
 }
 
@@ -344,15 +229,6 @@ private extension View {
     func cardSurface(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
         modifier(CardSurface(cornerRadius: cornerRadius, tint: tint))
     }
-}
-
-private struct PointProgramSummary: Identifiable {
-    let id: String
-    let program: Point?
-    let bankName: String
-    let pointName: String
-    let points: Int
-    let themeColors: [Color]
 }
 
 private struct PointSummaryCard: View {
@@ -985,4 +861,3 @@ private struct PointRemovalEntryView: View {
         dismiss()
     }
 }
-

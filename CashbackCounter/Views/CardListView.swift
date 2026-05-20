@@ -21,32 +21,8 @@ struct CardListView: View {
     var cards: [CreditCard]
     @Environment(\.modelContext) var context
     
-    // 控制编辑状态
-    @State private var cardToEdit: CreditCard?
-    // 控制添加状态
-    @State private var activeSheet: SheetType?
-    // 导入导出卡
-    @State private var showFileExporter = false
-    @State private var showFileImporter = false
-    @State private var importError: String?
-    @State private var showImportAlert = false
-    // 核心状态：当前展开的卡片 ID
-    @State private var selectedCardID: PersistentIdentifier? = nil
-    
-    // 滚动状态
-    @State private var scrollOffset: CGFloat = 0
-    
-    // 计算属性
-    private var isDetailMode: Bool {
-        selectedCardID != nil
-    }
-    
-    var cardfli: [Transaction] {
-        guard let selectedCard = cards.first(where: { $0.id == selectedCardID }) else {
-            return []
-        }
-        return (selectedCard.transactions ?? []).sorted { $0.date > $1.date }
-    }
+    // ViewModel
+    @State private var viewModel = CardListViewModel()
 
     // 动画参数
     private let springAnimation = Animation.spring(response: 0.5, dampingFraction: 0.75, blendDuration: 0)
@@ -58,7 +34,7 @@ struct CardListView: View {
                 Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
                 
                 // --- 图层 1: 交易详情列表 (在最底层) ---
-                if let selectedID = selectedCardID,
+                if let selectedID = viewModel.selectedCardID,
                    let selectedCard = cards.first(where: { $0.id == selectedID }) {
                     
                     ScrollView(showsIndicators: false) {
@@ -76,7 +52,7 @@ struct CardListView: View {
                         ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                             
                             // 计算当前卡片的状态
-                            let isSelected = card.id == selectedCardID
+                            let isSelected = card.id == viewModel.selectedCardID
                             
                             CreditCardView(
                                 bankName: card.bankName,
@@ -89,24 +65,20 @@ struct CardListView: View {
                             // 控制位置和动画
                             .offset(y: isSelected
                                     // 选中时：停在当前滚动位置 + 顶部留白
-                                    ? (scrollOffset + 120)
+                                    ? (viewModel.scrollOffset + 120)
                                     // 未选中时：正常列表逻辑
-                                    : (isDetailMode ? 800 : CGFloat(index * 100 + 20))
+                                    : (viewModel.isDetailMode ? 800 : CGFloat(index * 100 + 20))
                             )
                             // 控制透明度和缩放
-                            .opacity(isDetailMode && !isSelected ? 0 : 1)
-                            .scaleEffect(isDetailMode && !isSelected ? 0.9 : 1)
+                            .opacity(viewModel.isDetailMode && !isSelected ? 0 : 1)
+                            .scaleEffect(viewModel.isDetailMode && !isSelected ? 0.9 : 1)
                             // 控制层级
                             .zIndex(isSelected ? 100 : Double(index))
-                            .shadow(color: .black.opacity(isDetailMode ? 0.2 : 0.1), radius: isDetailMode ? 20 : 10, x: 0, y: 5)
+                            .shadow(color: .black.opacity(viewModel.isDetailMode ? 0.2 : 0.1), radius: viewModel.isDetailMode ? 20 : 10, x: 0, y: 5)
                             // 点击手势
                             .onTapGesture {
                                 withAnimation(springAnimation) {
-                                    if isSelected {
-                                        selectedCardID = nil
-                                    } else {
-                                        selectedCardID = card.id
-                                    }
+                                    viewModel.toggleCardSelection(card)
                                 }
                             }
                         }
@@ -122,17 +94,16 @@ struct CardListView: View {
                     geometry.contentOffset.y
                 } action: { oldValue, newValue in
                     // 只有在没展开卡片的时候更新位置，展开后锁定这个值
-                    if !isDetailMode {
-                        scrollOffset = newValue
+                    if !viewModel.isDetailMode {
+                        viewModel.scrollOffset = newValue
                     }
-                    // print("Offset: \(newValue)") // 调试用
                 }
-                .scrollDisabled(isDetailMode)
-                .allowsHitTesting(!isDetailMode)
+                .scrollDisabled(viewModel.isDetailMode)
+                .allowsHitTesting(!viewModel.isDetailMode)
                 .zIndex(1)
                 
                 // --- 点击关闭层 ---
-                if isDetailMode {
+                if viewModel.isDetailMode {
                     Color.clear // 透明色
                         .contentShape(Rectangle()) // 只有定义了形状才能响应点击
                         .frame(height: 220) // 高度与卡片一致
@@ -142,31 +113,32 @@ struct CardListView: View {
                         .onTapGesture {
                             // 点击这里触发关闭动画
                             withAnimation(springAnimation) {
-                                selectedCardID = nil
+                                viewModel.selectedCardID = nil
                             }
                         }
                 }
             }
             // ... (导航栏和 Toolbar 代码) ...
             .navigationTitle(
-                selectedCardID != nil
-                ? (cards.first(where: {$0.id == selectedCardID})?.bankName ?? "")
+                viewModel.selectedCardID != nil
+                ? (cards.first(where: {$0.id == viewModel.selectedCardID})?.bankName ?? "")
                 : "我的卡包"
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     // 判断当前是否有选中的卡片
-                    if let selectedID = selectedCardID,
+                    if let selectedID = viewModel.selectedCardID,
                        let selectedCard = cards.first(where: { $0.id == selectedID }) {
                         // ✨ 菜单：选中状态
                         Menu {
                             Button {
-                                cardToEdit = selectedCard
+                                viewModel.cardToEdit = selectedCard
                             } label: {
                                 Label("编辑卡片", systemImage: "pencil")
                             }
                             
+                            let cardfli = viewModel.selectedCardTransactions(from: cards)
                             if !cardfli.isEmpty,
                                let receiptsZipURL = cardfli.exportReceiptsZip() {
                                     ShareLink(items: [receiptsZipURL]) {
@@ -178,9 +150,7 @@ struct CardListView: View {
                             
                             Button(role: .destructive) {
                                 withAnimation(springAnimation) {
-                                    selectedCardID = nil
-                                    NotificationManager.shared.cancelNotification(for: selectedCard)
-                                    context.delete(selectedCard)
+                                    viewModel.deleteSelectedCard(from: cards, context: context)
                                 }
                             } label: {
                                 Label("删除卡片", systemImage: "trash")
@@ -193,9 +163,9 @@ struct CardListView: View {
                     } else {
                         // ✨ 菜单：默认状态
                         Menu {
-                            Button(action: { activeSheet = .template }) { Label("从模板添加", systemImage: "doc.on.doc") }
+                            Button(action: { viewModel.activeSheet = .template }) { Label("从模板添加", systemImage: "doc.on.doc") }
                             
-                            Button(action: { activeSheet = .custom }) { Label("自定义添加", systemImage: "square.and.pencil") }
+                            Button(action: { viewModel.activeSheet = .custom }) { Label("自定义添加", systemImage: "square.and.pencil") }
                             
                             Divider()
                             
@@ -208,7 +178,7 @@ struct CardListView: View {
                             }
                             
                             Button {
-                                showFileImporter = true
+                                viewModel.showFileImporter = true
                             } label: {
                                 Label("导入卡片", systemImage: "square.and.arrow.down")
                             }
@@ -229,43 +199,27 @@ struct CardListView: View {
                     }
                 }
             }
-            .sheet(item: $activeSheet) { type in
+            .sheet(item: $viewModel.activeSheet) { type in
                 switch type {
-                case .template: CardTemplateListView(rootSheet: $activeSheet)
+                case .template: CardTemplateListView(rootSheet: $viewModel.activeSheet)
                 case .custom: AddCardView()
                 }
             }
-            .sheet(item: $cardToEdit) { card in
+            .sheet(item: $viewModel.cardToEdit) { card in
                 AddCardView(cardToEdit: card)
             }
             // 👇 处理导入
             .fileImporter(
-                isPresented: $showFileImporter,
+                isPresented: $viewModel.showFileImporter,
                 allowedContentTypes: [.commaSeparatedText],
                 allowsMultipleSelection: false
             ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    guard url.startAccessingSecurityScopedResource() else { return }
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    
-                    do {
-                        let content = try String(contentsOf: url, encoding: .utf8)
-                        try CardCSVHelper.parseCSV(content: content, into: context)
-                        importError = nil
-                    } catch {
-                        importError = "导入失败：格式错误或文件损坏。\n\(error.localizedDescription)"
-                        showImportAlert = true
-                    }
-                case .failure(let error):
-                    print("选择文件失败: \(error.localizedDescription)")
-                }
+                viewModel.handleCardImport(result: result, context: context)
             }
-            .alert("导入结果", isPresented: $showImportAlert) {
+            .alert("导入结果", isPresented: $viewModel.showImportAlert) {
                 Button("确定", role: .cancel) { }
             } message: {
-                Text(importError ?? "未知错误")
+                Text(viewModel.importError ?? "未知错误")
             }
         
         }

@@ -26,7 +26,6 @@ struct SettingsView: View {
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
     
     @Environment(\.modelContext) var context
-    @State private var showConfirmClear: Bool = false
     
     // 获取数据库数据
     @Query var cards: [CreditCard]
@@ -38,11 +37,8 @@ struct SettingsView: View {
     )
     var transactions: [Transaction]
     
-    // MARK: - Export State
-    // 2. 修改：使用 item 形式的状态来控制 Sheet
-    @State private var shareData: ShareData?
-    // 3. 新增：控制导出过程中的 Loading 状态
-    @State private var isExporting = false
+    // ViewModel
+    @State private var viewModel = SettingsViewModel()
 
     // MARK: - Body
     var body: some View {
@@ -120,13 +116,13 @@ struct SettingsView: View {
                 // Data Management Section
                 Section(header: Text("数据管理")) {
                     Button {
-                        startExportProcess()
+                        viewModel.startExportProcess(cards: cards, transactions: transactions)
                     } label: {
                         HStack {
                             Label("全部数据导出", systemImage: "square.and.arrow.up")
                             Spacer()
                             
-                            if isExporting {
+                            if viewModel.isExporting {
                                 ProgressView()
                                     .padding(.leading, 5)
                             } else {
@@ -136,7 +132,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    .disabled(isExporting) // 导出过程中禁止重复点击
+                    .disabled(viewModel.isExporting) // 导出过程中禁止重复点击
 
                     NavigationLink(destination: PrivacyPolicyView()) {
                         Label("隐私政策", systemImage: "hand.raised")
@@ -166,18 +162,18 @@ struct SettingsView: View {
                 // Reset Section
                 Section {
                     Button(role: .destructive) {
-                        showConfirmClear = true
+                        viewModel.showConfirmClear = true
                     } label: {
                         Label("重置所有数据 (慎用)", systemImage: "trash")
                             .foregroundColor(.red)
                     }
                     .confirmationDialog(
                         "确定要清除所有数据吗？",
-                        isPresented: $showConfirmClear,
+                        isPresented: $viewModel.showConfirmClear,
                         titleVisibility: .visible
                     ) {
                         Button("清除", role: .destructive) {
-                            clearAllData()
+                            viewModel.clearAllData(context: context)
                         }
                         Button("取消", role: .cancel) {}
                     }
@@ -187,72 +183,10 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             // 4. 关键修复：使用 item: $shareData 绑定
             // 只有当 shareData 有值时，才会初始化并显示 ActivityViewController
-            .sheet(item: $shareData) { data in
+            .sheet(item: $viewModel.shareData) { data in
                 ActivityViewController(activityItems: data.items)
                     .presentationDetents([.medium, .large])
             }
-        }
-    }
-    
-    // MARK: - Logic Methods
-    
-    /// 开始异步导出流程
-    private func startExportProcess() {
-        // 1. 开启 Loading 状态
-        isExporting = true
-        
-        Task {
-            // 2. 稍微延迟一点点 (0.2秒)，让 UI 有机会刷新出 ProgressView
-            // 否则在主线程做繁重工作会直接卡住 UI，连转圈都看不到
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            
-            // 3. 执行导出数据生成 (耗时操作)
-            let items = generateExportItems()
-            
-            // 4. 完成后更新 UI 状态
-            // Task 在 SwiftUI View 中默认运行在 MainActor，所以可以直接更新 State
-            isExporting = false
-            
-            if !items.isEmpty {
-                // 赋值给 shareData，自动触发 .sheet(item: ...)
-                self.shareData = ShareData(items: items)
-            }
-        }
-    }
-    
-    /// 生成导出文件 (CSV + ZIP)
-    private func generateExportItems() -> [Any] {
-        var items: [Any] = []
-        
-        // A. 导出卡片 CSV
-        if let cardCSV = cards.exportCSVFile() {
-            items.append(cardCSV)
-        }
-        
-        // B. 导出账单+收据 ZIP
-        if let backupZip = transactions.exportReceiptsZip() {
-            items.append(backupZip)
-        }
-        
-        return items
-    }
-    
-    private func clearAllData() {
-        do {
-            try deleteAll(of: Transaction.self)
-            try deleteAll(of: CreditCard.self)
-            try context.save()
-            print("✅ All data cleared")
-        } catch {
-            print("❌ Failed to clear data: \(error)")
-        }
-    }
-
-    private func deleteAll<T>(of type: T.Type) throws where T: SwiftData.PersistentModel {
-        let descriptor = SwiftData.FetchDescriptor<T>()
-        let items = try context.fetch(descriptor)
-        for item in items {
-            context.delete(item)
         }
     }
 }
@@ -271,7 +205,7 @@ private struct PrivacyPolicyView: View {
                 Text("• 数据存储：账单、卡片、积分等数据全部保存在你的设备本地，我们不上传任何个人数据。")
                 Text("• 网络请求：应用可能会为获取汇率、下载卡面等功能访问网络，仅下载必要参数。")
                 Text("• 权限使用：相机、相册、通知等权限仅在对应功能使用时申请，可在系统设置中随时关闭。")
-                Text("• 分享导出：仅当你主动使用“导出”功能时，数据才会通过系统导出面板离开应用。")
+                Text("• 分享导出：仅当你主动使用导出功能时，数据才会通过系统导出面板离开应用。")
 
                 Text("若你对隐私相关内容有疑问，请联系开发者。")
                     .foregroundColor(.secondary)
@@ -298,7 +232,7 @@ private struct UpdateNotesView: View {
                 Text("当前版本：v\(appVersion)")
                     .foregroundColor(.secondary)
 
-                Text("• 更新前建议使用“全部数据导出”进行备份！！！（重要）。")
+                Text("• 更新前建议使用全部数据导出进行备份！！！（重要）。")
                 Text("• 更新后首次打开可能需要短暂时间完成数据整理。")
                 Text("• 若更新后出现应用闪退或异常的情况请删除应用，重新下载并导入之前备份的数据")
                 Text("• 若问题仍存在，请联系开发者协助排查。")
