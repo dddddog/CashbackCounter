@@ -79,7 +79,7 @@ struct CardCSVHelper {
         let templates = CardTemplateManager.shared.templates
         let templateMap = Dictionary(templates.map { ($0.templateKey, $0) }, uniquingKeysWith: { first, _ in first })
         let points = try context.fetch(FetchDescriptor<Point>())
-        var pointMap: [String: Point] = Dictionary(uniqueKeysWithValues: points.map { (pointKey(for: $0), $0) })
+        var pointMap: [String: Point] = Dictionary(points.map { (pointKey(for: $0), $0) }, uniquingKeysWith: { first, _ in first })
         let templatePointMap = Dictionary(points.map {
             (CardTemplate.pointTemplateKey(bankName: $0.bankName, pointName: $0.pointName, currencyCode: $0.valueCurrencyCode), $0)
         }, uniquingKeysWith: { first, _ in first })

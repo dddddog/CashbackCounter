@@ -52,6 +52,9 @@ final class SettingsViewModel {
         do {
             try deleteAll(of: Transaction.self, context: context)
             try deleteAll(of: CreditCard.self, context: context)
+            try deleteAll(of: Income.self, context: context)
+            try deleteAll(of: Point.self, context: context)
+            try deleteAll(of: PointAdjustment.self, context: context)
             try context.save()
             print("✅ All data cleared")
         } catch {
