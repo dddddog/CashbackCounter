@@ -23,12 +23,13 @@ struct CashbackCounterApp: App { // 2. 这个结构体必须遵守 App 协议
             let schema = Schema([
                 Transaction.self, CreditCard.self, Income.self, Point.self, PointAdjustment.self
             ])
+            let isSyncEnabled = UserDefaults.standard.object(forKey: "iCloudSyncEnabled") as? Bool ?? true
             #if targetEnvironment(simulator)
             // 在模拟器中，如果未登录 iCloud 或 CloudKit 容器未配置好，频繁的同步重试会导致控制台无限输出 Zone Not Found 错误，从而引发主线程严重卡顿。
             // 故在模拟器环境下默认不启用 CloudKit 同步，保证开发调试时的流畅度。
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: nil)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
             #else
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: isSyncEnabled ? .automatic : .none)
             #endif
             container = try ModelContainer(for: schema, configurations: [config])
         } catch {

@@ -24,6 +24,8 @@ struct SettingsView: View {
     @AppStorage("userTheme") private var userTheme: Int = 0
     @AppStorage("userLanguage") private var userLanguage: String = "system"
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
+    @AppStorage("iCloudSyncEnabled") private var iCloudSyncEnabled: Bool = true
+    @State private var showSyncChangeAlert = false
     
     @Environment(\.modelContext) var context
     
@@ -115,6 +117,23 @@ struct SettingsView: View {
                 
                 // Data Management Section
                 Section(header: Text("数据管理")) {
+                    Toggle(isOn: $iCloudSyncEnabled) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("iCloud 数据同步")
+                                Text("在登录相同 Apple ID 的设备间自动同步")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "icloud.fill")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .onChange(of: iCloudSyncEnabled) { _, _ in
+                        showSyncChangeAlert = true
+                    }
+
                     Button {
                         viewModel.startExportProcess(cards: cards, transactions: transactions)
                     } label: {
@@ -186,6 +205,11 @@ struct SettingsView: View {
             .sheet(item: $viewModel.shareData) { data in
                 ActivityViewController(activityItems: data.items)
                     .presentationDetents([.medium, .large])
+            }
+            .alert("同步设置已更改", isPresented: $showSyncChangeAlert) {
+                Button("好的", role: .cancel) { }
+            } message: {
+                Text("iCloud 数据同步设置已更改。请完全退出应用并重新启动，以使新的同步配置生效。")
             }
         }
     }
