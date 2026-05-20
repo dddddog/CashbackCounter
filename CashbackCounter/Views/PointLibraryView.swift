@@ -75,6 +75,8 @@ struct PointEditorView: View {
     @State private var pointName: String
     @State private var pointValueStr: String
     @State private var currencyRegion: Region
+    @State private var isActive: Bool
+    @State private var note: String
 
     init(pointToEdit: Point? = nil) {
         self.pointToEdit = pointToEdit
@@ -83,11 +85,15 @@ struct PointEditorView: View {
             _pointName = State(initialValue: point.pointName)
             _pointValueStr = State(initialValue: String(point.pointValue))
             _currencyRegion = State(initialValue: point.valueCurrencyCode)
+            _isActive = State(initialValue: point.isActive)
+            _note = State(initialValue: point.note)
         } else {
             _bankName = State(initialValue: "")
             _pointName = State(initialValue: "")
             _pointValueStr = State(initialValue: "0.01")
             _currencyRegion = State(initialValue: .cn)
+            _isActive = State(initialValue: true)
+            _note = State(initialValue: "")
         }
     }
 
@@ -114,6 +120,15 @@ struct PointEditorView: View {
                         }
                     }
                 }
+
+                Section(header: Text("状态")) {
+                    Toggle("启用中", isOn: $isActive)
+                }
+
+                Section(header: Text("备注")) {
+                    TextField("例如：积分每年清零", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                }
             }
             .navigationTitle(pointToEdit == nil ? "新增积分计划" : "编辑积分计划")
             .navigationBarTitleDisplayMode(.inline)
@@ -136,12 +151,16 @@ struct PointEditorView: View {
             existing.pointName = pointName
             existing.pointValue = pointValue
             existing.valueCurrencyCode = currencyRegion
+            existing.isActive = isActive
+            existing.note = note
         } else {
             let newPoint = Point(
                 bankName: bankName,
                 pointName: pointName,
                 pointValue: pointValue,
-                valueCurrencyCode: currencyRegion
+                valueCurrencyCode: currencyRegion,
+                isActive: isActive,
+                note: note
             )
             context.insert(newPoint)
         }

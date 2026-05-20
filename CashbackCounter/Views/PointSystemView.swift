@@ -471,6 +471,7 @@ private struct PointDetailView: View {
             VStack(spacing: 16) {
                 headerCard
                 chartCard
+                historyCard
             }
             .padding()
         }
@@ -581,6 +582,59 @@ private struct PointDetailView: View {
         .cardSurface(cornerRadius: 16)
     }
 
+    private var historyCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("积分变动明细")
+                .font(.headline)
+                .padding(.bottom, 8)
+            
+            if historyItems.isEmpty {
+                Text("暂无积分变动记录")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(historyItems) { item in
+                    HStack(spacing: 12) {
+                        Image(systemName: item.iconSystemName)
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(item.iconColor)
+                            .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(.subheadline.weight(.medium))
+                            if let subtitle = item.subtitle, !subtitle.isEmpty {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(item.date, style: .date)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("\(item.points > 0 ? "+" : "")\(formattedPoints(item.points))")
+                            .font(.headline)
+                            .foregroundColor(item.points > 0 ? .green : .red)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    if item.id != historyItems.last?.id {
+                        Divider()
+                            .padding(.leading, 48)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .cardSurface(cornerRadius: 16)
+    }
+
     private var relatedTransactions: [Transaction] {
         transactions.filter { transaction in
             if let program = summary.program {
@@ -593,6 +647,36 @@ private struct PointDetailView: View {
     private var relatedAdjustments: [PointAdjustment] {
         guard let program = summary.program else { return [] }
         return adjustments.filter { $0.pointProgram?.id == program.id }
+    }
+
+    private var historyItems: [PointHistoryItem] {
+        var items: [PointHistoryItem] = []
+        
+        // 1. 手动/系统调整记录
+        for adj in relatedAdjustments {
+            items.append(PointHistoryItem(
+                date: adj.date,
+                points: adj.points,
+                title: adj.type.displayName,
+                subtitle: adj.note.isEmpty ? nil : adj.note,
+                iconSystemName: adj.type.iconName,
+                iconColor: accentColor
+            ))
+        }
+        
+        // 2. 交易返积分记录
+        for tx in relatedTransactions where tx.pointsEarned > 0 {
+            items.append(PointHistoryItem(
+                date: tx.date,
+                points: tx.pointsEarned,
+                title: tx.merchant,
+                subtitle: "消费获得",
+                iconSystemName: "cart.fill",
+                iconColor: .orange
+            ))
+        }
+        
+        return items.sorted(by: { $0.date > $1.date })
     }
 
     private var chartData: [MonthlyPointSnapshot] {
@@ -669,6 +753,16 @@ private struct MonthlyPointSnapshot: Identifiable {
     let date: Date
     let points: Double
 }
+
+private struct PointHistoryItem: Identifiable {
+    let id = UUID()
+    let date: Date
+    let points: Int
+    let title: String
+    let subtitle: String?
+    let iconSystemName: String
+    let iconColor: Color
+}
 private struct PointAdjustmentEntryView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -679,6 +773,11 @@ private struct PointAdjustmentEntryView: View {
     @State private var selectedPointID: UUID?
     @State private var pointsText: String = ""
     @State private var date: Date = Date()
+    @State private var adjustmentType: AdjustmentType = .bonus
+    @State private var note: String = ""
+
+    // 添加积分时可用的类型
+    private let addTypes: [AdjustmentType] = [.bonus, .earn, .transfer, .manual]
 
     var body: some View {
         NavigationView {
@@ -710,8 +809,22 @@ private struct PointAdjustmentEntryView: View {
                             }
                         }
 
+                        Section(header: Text("类型")) {
+                            Picker("调整类型", selection: $adjustmentType) {
+                                ForEach(addTypes, id: \.self) { type in
+                                    Label(type.displayName, systemImage: type.iconName)
+                                        .tag(type)
+                                }
+                            }
+                        }
+
                         Section(header: Text("日期")) {
                             DatePicker("入账日期", selection: $date, in: ...Date(), displayedComponents: .date)
+                        }
+
+                        Section(header: Text("备注（可选）")) {
+                            TextField("例如：开卡奖励 50000 分", text: $note, axis: .vertical)
+                                .lineLimit(2...4)
                         }
                     }
                 }
@@ -756,7 +869,7 @@ private struct PointAdjustmentEntryView: View {
 
     private func save() {
         guard let point = selectedPoint, let value = pointsValue, value > 0 else { return }
-        let adjustment = PointAdjustment(pointProgram: point, points: value, date: date)
+        let adjustment = PointAdjustment(pointProgram: point, points: value, date: date, type: adjustmentType, note: note)
         context.insert(adjustment)
         dismiss()
     }
@@ -771,6 +884,11 @@ private struct PointRemovalEntryView: View {
     @State private var selectedPointID: UUID?
     @State private var pointsText: String = ""
     @State private var date: Date = Date()
+    @State private var adjustmentType: AdjustmentType = .redeem
+    @State private var note: String = ""
+
+    // 移除积分时可用的类型
+    private let removeTypes: [AdjustmentType] = [.redeem, .expire, .transfer, .manual]
 
     var body: some View {
         NavigationView {
@@ -802,8 +920,22 @@ private struct PointRemovalEntryView: View {
                             }
                         }
 
+                        Section(header: Text("类型")) {
+                            Picker("调整类型", selection: $adjustmentType) {
+                                ForEach(removeTypes, id: \.self) { type in
+                                    Label(type.displayName, systemImage: type.iconName)
+                                        .tag(type)
+                                }
+                            }
+                        }
+
                         Section(header: Text("日期")) {
                             DatePicker("入账日期", selection: $date, in: ...Date(), displayedComponents: .date)
+                        }
+
+                        Section(header: Text("备注（可选）")) {
+                            TextField("例如：兑换机票", text: $note, axis: .vertical)
+                                .lineLimit(2...4)
                         }
                     }
                 }
@@ -848,8 +980,9 @@ private struct PointRemovalEntryView: View {
 
     private func save() {
         guard let point = selectedPoint, let value = pointsValue, value > 0 else { return }
-        let adjustment = PointAdjustment(pointProgram: point, points: -value, date: date)
+        let adjustment = PointAdjustment(pointProgram: point, points: -value, date: date, type: adjustmentType, note: note)
         context.insert(adjustment)
         dismiss()
     }
 }
+

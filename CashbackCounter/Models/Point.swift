@@ -9,17 +9,42 @@ final class Point: Identifiable {
     var pointValue: Double
     var valueCurrencyCode: Region
 
+    // 元信息
+    var isActive: Bool = true
+    var createdAt: Date = Date()
+    var note: String = ""
+
+    // 反向关系：哪些信用卡使用了这个积分计划
+    // 删除 Point 时，卡的 pointProgram 设为 nil
+    @Relationship(deleteRule: .nullify, inverse: \CreditCard.pointProgram)
+    var cards: [CreditCard]?
+
+    // 反向关系：关联的积分调整记录
+    // 删除 Point 时，关联的调整记录一并删除
+    @Relationship(deleteRule: .cascade, inverse: \PointAdjustment.pointProgram)
+    var adjustments: [PointAdjustment]?
+
+    // 反向关系：哪些卡片模板使用了这个积分计划
+    // 删除 Point 时，模板的 pointProgram 设为 nil
+    @Relationship(deleteRule: .nullify, inverse: \CardTemplate.pointProgram)
+    var templates: [CardTemplate]?
+
     init(
         bankName: String,
         pointName: String,
         pointValue: Double,
-        valueCurrencyCode: Region
+        valueCurrencyCode: Region,
+        isActive: Bool = true,
+        note: String = ""
     ) {
         self.id = UUID()
         self.bankName = bankName
         self.pointName = pointName
         self.pointValue = pointValue
         self.valueCurrencyCode = valueCurrencyCode
+        self.isActive = isActive
+        self.createdAt = Date()
+        self.note = note
     }
 
     var displayName: String {

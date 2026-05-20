@@ -508,7 +508,17 @@ struct AddTransactionView: View {
                     paymentMethod: paymentMethod // 👈 写入数据库
                 )
                 context.insert(newTransaction)
+                
+                // 双向关系同步，确保 UI 立即刷新
+                if card.transactions == nil {
+                    card.transactions = [newTransaction]
+                } else {
+                    card.transactions?.append(newTransaction)
+                }
             }
+            
+            // 强制保存上下文，刷新跨页面的关联数据 (@Query)
+            try? context.save()
             
             dismiss()
             onSaved?()
