@@ -183,7 +183,7 @@ struct AddCardView: View {
             _paymentMethodRates = State(initialValue: template.paymentMethodRates)
             _paymentCaps = State(initialValue: template.paymentCaps)
             _rewardType = State(initialValue: template.rewardType)
-            _selectedPointID = State(initialValue: template.pointProgram?.id)
+            _selectedPointID = State(initialValue: nil)
             
             
         }
@@ -416,6 +416,14 @@ struct AddCardView: View {
                 if cardImageData == nil, let url = template?.pictureURL {
                     Task {
                         await imageManager.downloadImage(from: url)
+                    }
+                }
+                
+                if cardToEdit == nil, let tpl = template, selectedPointID == nil {
+                    if let key = tpl.pointProgramKey {
+                        if let matched = points.first(where: { CardTemplate.pointTemplateKey(bankName: $0.bankName, pointName: $0.pointName, currencyCode: $0.valueCurrencyCode) == key }) {
+                            selectedPointID = matched.id
+                        }
                     }
                 }
             }

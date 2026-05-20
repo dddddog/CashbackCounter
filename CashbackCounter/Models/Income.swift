@@ -3,12 +3,12 @@ import SwiftData
 
 @Model
 class Income: Identifiable {
-    var amount: Double
-    var date: Date
-    var location: Region
-    var detail : String
-    var platform : String
-    var isReceived: Bool
+    var amount: Double = 0.0
+    var date: Date = Date()
+    var location: Region = Region.cn
+    var detail : String = ""
+    var platform : String = ""
+    var isReceived: Bool = false
     
     @Relationship(deleteRule: .nullify)
     var transaction: Transaction?

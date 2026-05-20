@@ -220,11 +220,13 @@ struct CardListView: View {
                 }
             }
             .onAppear {
-                do {
-                    try CardTemplate.syncDefaultTemplates(in: context)
-                    try CardTemplate.refreshCardsFromTemplates(in: context)
-                } catch {
-                    print("Failed to sync card templates: \(error)")
+                Task { @MainActor in
+                    await CardTemplateManager.shared.syncTemplates()
+                    do {
+                        try CardTemplateManager.shared.refreshCardsFromTemplates(in: context)
+                    } catch {
+                        print("Failed to sync card templates: \(error)")
+                    }
                 }
             }
             .sheet(item: $activeSheet) { type in

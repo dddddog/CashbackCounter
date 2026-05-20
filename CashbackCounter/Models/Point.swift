@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class Point: Identifiable {
-    @Attribute(.unique) var id: UUID
-    var bankName: String
-    var pointName: String
-    var pointValue: Double
-    var valueCurrencyCode: Region
+    var id: UUID = UUID()
+    var bankName: String = ""
+    var pointName: String = ""
+    var pointValue: Double = 0.0
+    var valueCurrencyCode: Region = Region.cn
 
     // 元信息
     var isActive: Bool = true
@@ -24,10 +24,6 @@ final class Point: Identifiable {
     @Relationship(deleteRule: .cascade, inverse: \PointAdjustment.pointProgram)
     var adjustments: [PointAdjustment]?
 
-    // 反向关系：哪些卡片模板使用了这个积分计划
-    // 删除 Point 时，模板的 pointProgram 设为 nil
-    @Relationship(deleteRule: .nullify, inverse: \CardTemplate.pointProgram)
-    var templates: [CardTemplate]?
 
     init(
         bankName: String,

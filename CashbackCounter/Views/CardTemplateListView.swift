@@ -11,10 +11,7 @@ import SwiftData
 struct CardTemplateListView: View {
     @Environment(\.modelContext) var context
     @Environment(\.dismiss) var dismiss
-    @Query(sort: [
-        SortDescriptor<CardTemplate>(\.bankName),
-        SortDescriptor<CardTemplate>(\.type)
-    ]) private var templates: [CardTemplate]
+    @Environment(CardTemplateManager.self) var templateManager
 
     // 1. 控制跳转的状态：存用户选了哪个模板
     @State private var selectedTemplate: CardTemplate?
@@ -22,7 +19,9 @@ struct CardTemplateListView: View {
 
     var body: some View {
         NavigationView {
-            List(templates) { item in
+            List(templateManager.templates.sorted(by: { 
+                $0.bankName < $1.bankName || ($0.bankName == $1.bankName && $0.type < $1.type)
+            })) { item in
                 Button(action: {
                     // 👇 点击后，不直接保存，而是记录选了谁
                     selectedTemplate = item

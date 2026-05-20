@@ -35,14 +35,14 @@ enum AdjustmentType: String, Codable, CaseIterable {
 
 @Model
 final class PointAdjustment: Identifiable {
-    @Attribute(.unique) var id: UUID
-    var points: Int
-    var date: Date
+    var id: UUID = UUID()
+    var points: Int = 0
+    var date: Date = Date()
     var type: AdjustmentType = AdjustmentType.manual
     var note: String = ""
     var pointProgram: Point?
 
-    init(pointProgram: Point?, points: Int, date: Date = Date(), type: AdjustmentType = .manual, note: String = "") {
+    init(pointProgram: Point?, points: Int, date: Date = Date(), type: AdjustmentType = AdjustmentType.manual, note: String = "") {
         self.id = UUID()
         self.pointProgram = pointProgram
         self.points = points

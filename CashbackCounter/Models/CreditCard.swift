@@ -30,30 +30,30 @@ enum RewardType: String, Codable, CaseIterable {
 @Model // 👈 1. 变身数据库表
 class CreditCard: Identifiable {
     // 自动生成的主键，不需要手动 id 了
-    var bankName: String
-    var type: String
-    var endNum: String
+    var bankName: String = ""
+    var type: String = ""
+    var endNum: String = ""
     var repaymentDay: Int = 0
     var isRemindOpen: Bool = true // 默认为 true (直接开启)
     
     // ⚠️ 2. 颜色处理：数据库存 Hex 字符串，App 用 Color
-    var colorHexes: [String]
+    var colorHexes: [String] = []
     @Transient // 告诉数据库不要存这个属性，这是算出来的
     var colors: [Color] {
         return colorHexes.map { Color(hex: $0) }
     }
     
-    var defaultRate: Double
+    var defaultRate: Double = 0.0
     // 3. 字典处理：SwiftData 对字典支持有限，但 Category 是 Codable 的，通常可以直接存。
     // 如果这里报错，我们需要换成 JSON String。目前先尝试直接存。
-    var specialRates: [Category: Double]
+    var specialRates: [Category: Double] = [:]
     var paymentMethodRates: [PaymentMethod: Double] = [:] // 针对支付方式的加成费率
 
     var rewardType: RewardType = RewardType.cashback
     var pointProgram: Point?
 
     
-    var issueRegion: Region
+    var issueRegion: Region = Region.cn
     var foreignCurrencyRate: Double?
 
     // 记录该卡是否来源于某个模板，便于模板更新时同步规则
@@ -63,8 +63,8 @@ class CreditCard: Identifiable {
         
     // A. 基础返现上限 (双轨制：分本币/外币)
     // 0 代表无上限
-    var localBaseCap: Double
-    var foreignBaseCap: Double
+    var localBaseCap: Double = 0.0
+    var foreignBaseCap: Double = 0.0
     
     // 返现上限结算周期：按年 / 按月
     var capPeriod: CapPeriod = CapPeriod.yearly
@@ -93,12 +93,12 @@ class CreditCard: Identifiable {
         localBaseCap: Double = 0,
         foreignBaseCap: Double = 0,
         categoryCaps: [Category: Double] = [:], // 改为单字典
-        capPeriod: CapPeriod = .yearly,
+        capPeriod: CapPeriod = CapPeriod.yearly,
         repaymentDay: Int = 0,
         isRemindOpen: Bool = true,
         paymentMethodRates: [PaymentMethod: Double] = [:],
         paymentCaps: [PaymentMethod: Double] = [:],
-        rewardType: RewardType = .cashback,
+        rewardType: RewardType = RewardType.cashback,
         pointProgram: Point? = nil,
         cardImageData: Data? = nil // 👈 新增参数
     ) {

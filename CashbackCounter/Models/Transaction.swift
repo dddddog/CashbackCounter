@@ -3,22 +3,22 @@ import SwiftData
 
 @Model
 class Transaction: Identifiable {
-    var merchant: String
-    var category: Category
-    var location: Region
+    var merchant: String = ""
+    var category: Category = Category.other
+    var location: Region = Region.cn
     
-    var amount: Double        // 原币金额
-    var billingAmount: Double // 入账金额
+    var amount: Double = 0.0        // 原币金额
+    var billingAmount: Double = 0.0 // 入账金额
     
-    var date: Date
-    var cashbackamount: Double
-    var pointsEarned: Int
-    var rate: Double
+    var date: Date = Date()
+    var cashbackamount: Double = 0.0
+    var pointsEarned: Int = 0
+    var rate: Double = 0.0
     
     var card: CreditCard?
     
     // 👇 1. 新增字段：记录消费方式 (Apple Pay, 线下等)
-    var paymentMethod: PaymentMethod
+    var paymentMethod: PaymentMethod = PaymentMethod.offline
     
     @Attribute(.externalStorage) var receiptData: Data?
     

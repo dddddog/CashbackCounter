@@ -76,10 +76,13 @@ struct CardCSVHelper {
     // MARK: - 导入逻辑 (解析字符串)
     static func parseCSV(content: String, into context: ModelContext) throws {
         let rows = content.components(separatedBy: .newlines)
-        let templates = try context.fetch(FetchDescriptor<CardTemplate>())
-        let templateMap = Dictionary(uniqueKeysWithValues: templates.map { ($0.templateKey, $0) })
+        let templates = CardTemplateManager.shared.templates
+        let templateMap = Dictionary(templates.map { ($0.templateKey, $0) }, uniquingKeysWith: { first, _ in first })
         let points = try context.fetch(FetchDescriptor<Point>())
         var pointMap: [String: Point] = Dictionary(uniqueKeysWithValues: points.map { (pointKey(for: $0), $0) })
+        let templatePointMap = Dictionary(points.map {
+            (CardTemplate.pointTemplateKey(bankName: $0.bankName, pointName: $0.pointName, currencyCode: $0.valueCurrencyCode), $0)
+        }, uniquingKeysWith: { first, _ in first })
 
 
         for (index, row) in rows.enumerated() {
@@ -210,7 +213,7 @@ struct CardCSVHelper {
             // 现有逻辑是“如果匹配到模板，就用模板覆盖”，这保留了动态更新的能力。
             let templateKey = CardTemplate.templateKey(bankName: bankName, type: type)
             if let template = templateMap[templateKey] {
-                template.applyRules(to: newCard)
+                template.applyRules(to: newCard, pointMap: templatePointMap)
             }
 
             context.insert(newCard)

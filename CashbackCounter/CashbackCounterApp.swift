@@ -14,18 +14,31 @@ struct CashbackCounterApp: App { // 2. 这个结构体必须遵守 App 协议
     @AppStorage("userTheme") private var userTheme: Int = 0
     @AppStorage("userLanguage") private var userLanguage: String = "system"
     
+    let container: ModelContainer
+    
     init() {
         NotificationManager.shared.requestAuthorization()
+        
+        do {
+            // 启用 CloudKit 自动同步配置
+            let schema = Schema([
+                Transaction.self, CreditCard.self, Income.self, Point.self, PointAdjustment.self
+            ])
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+            container = try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            fatalError("Failed to configure SwiftData container with CloudKit: \(error)")
+        }
     }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(CardTemplateManager.shared)
                 .preferredColorScheme(userTheme == 1 ? .light : (userTheme == 2 ? .dark : nil))
                 .environment(\.locale, userLanguage == "system" ? .current : Locale(identifier: userLanguage))
-
         }
-        .modelContainer(for: [Transaction.self, CreditCard.self, CardTemplate.self, Income.self, Point.self, PointAdjustment.self])
+        .modelContainer(container)
         
     }
 }

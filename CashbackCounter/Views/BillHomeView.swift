@@ -490,10 +490,14 @@ NEG_EXPENSE | merchant=\(transaction.merchant) | date=\(transaction.dateString) 
             }
         }
         .onAppear {
-            do {
-                try CardTemplate.syncDefaultTemplates(in: context)
-                try CardTemplate.refreshCardsFromTemplates(in: context)
-            } catch { print("Failed to sync card templates: \(error)") }
+            Task { @MainActor in
+                await CardTemplateManager.shared.syncTemplates()
+                do {
+                    try CardTemplateManager.shared.refreshCardsFromTemplates(in: context)
+                } catch {
+                    print("Failed to refresh cards from templates: \(error)")
+                }
+            }
         }
     }
 }
