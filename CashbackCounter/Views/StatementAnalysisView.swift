@@ -96,7 +96,7 @@ struct StatementAnalysisEntryView: View {
             ProgressView("解析中...")
                 .padding(16)
                 .background(.ultraThinMaterial)
-                .cornerRadius(12)
+                .cornerRadius(DesignConstants.CornerRadius.large)
         }
     }
 

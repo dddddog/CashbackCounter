@@ -14,7 +14,7 @@ final class CashbackCounterTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
 
-        let schema = Schema([CreditCard.self, Transaction.self, Point.self, PointAdjustment.self, Income.self, CardTemplate.self])
+        let schema = Schema([CreditCard.self, Transaction.self, Point.self, PointAdjustment.self, Income.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: schema, configurations: [config])
         context = ModelContext(container)
@@ -162,6 +162,52 @@ final class CashbackCounterTests: XCTestCase {
         XCTAssertEqual(cashback, 45.0, accuracy: 0.0001)
     }
 
+    // MARK: - 边界条件与异常输入测试
+    
+    func testCalculateCashback_ZeroAmount() async {
+        let card = makeCard(defaultRate: 0.01)
+        let cashback = card.calculateCappedCashback(amount: 0, category: .other, location: .hk, date: Date(), paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(cashback, 0.0)
+    }
+
+    func testCalculateCashback_FractionalAmount() async {
+        let card = makeCard(defaultRate: 0.015)
+        let cashback = card.calculateCappedCashback(amount: 10.55, category: .other, location: .hk, date: Date(), paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(cashback, 0.15825, accuracy: 0.0001)
+    }
+
+    func testCalculateCashback_NegativeAmount_Refund() async {
+        // 退款应该扣除相应的返现
+        let card = makeCard(defaultRate: 0.01, specialRates: [.dining: 0.05])
+        let cashback = card.calculateCappedCashback(amount: -100, category: .dining, location: .hk, date: Date(), paymentMethod: .offline, transactionToExclude: nil)
+        // 基础退 -1.0，类别退 -5.0 = -6.0
+        XCTAssertEqual(cashback, -6.0, accuracy: 0.0001)
+    }
+
+    func testCalculateCashback_ExcludeTransaction() async {
+        let card = makeCard(defaultRate: 0.01, localBaseCap: 10)
+        let now = Date()
+        
+        // Transaction to exclude (which would normally consume the entire cap)
+        let txToExclude = makeTransaction(card: card, amount: 1000, category: .other, date: now)
+        
+        // Calculate with exclusion
+        let cashback = card.calculateCappedCashback(amount: 1000, category: .other, location: .hk, date: now, paymentMethod: .offline, transactionToExclude: txToExclude)
+        XCTAssertEqual(cashback, 10.0, accuracy: 0.0001) // cap should not be consumed by txToExclude
+    }
+
+    func testCalculateCashback_ForeignBaseCap() async {
+        let card = makeCard(defaultRate: 0.01, issueRegion: .hk, foreignCurrencyRate: 0.02, localBaseCap: 5, foreignBaseCap: 15)
+        
+        // 本地消费受限于 localBaseCap = 5
+        let localCashback = card.calculateCappedCashback(amount: 1000, category: .other, location: .hk, date: Date(), paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(localCashback, 5.0, accuracy: 0.0001) // 1000 * 0.01 = 10 -> min(10, 5) = 5
+        
+        // 外币消费受限于 foreignBaseCap = 15
+        let foreignCashback = card.calculateCappedCashback(amount: 1000, category: .other, location: .us, date: Date(), paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(foreignCashback, 15.0, accuracy: 0.0001) // 1000 * 0.02 = 20 -> min(20, 15) = 15
+    }
+
     // MARK: - 4. 历史额度消耗与周期
 
     func testCapPartiallyUsedByHistory() {
@@ -188,6 +234,31 @@ final class CashbackCounterTests: XCTestCase {
         // 这个月重新计算，全额拿到 10
         let cashback = card.calculateCappedCashback(amount: 1000, category: .other, location: .hk, date: now, paymentMethod: .offline, transactionToExclude: nil)
         XCTAssertEqual(cashback, 10.0, accuracy: 0.0001)
+    }
+
+    func testYearlyCapReset_CrossYear() async {
+        let card = makeCard(defaultRate: 0.01, specialRates: [.dining: 0.05], categoryCaps: [.dining: 20], capPeriod: .yearly)
+        
+        // 构造日期：去年 12 月 31 日
+        var comps = DateComponents(year: 2025, month: 12, day: 31)
+        let endOfLastYear = Calendar.current.date(from: comps)!
+        
+        // 构造日期：今年 1 月 1 日
+        comps.year = 2026
+        comps.month = 1
+        comps.day = 1
+        let startOfThisYear = Calendar.current.date(from: comps)!
+        
+        // 去年年底把餐饮额度刷满了
+        _ = makeTransaction(card: card, amount: 2000, category: .dining, date: endOfLastYear)
+        
+        // 去年年底再刷，餐饮部分应该没有了
+        let lastYearCashback = card.calculateCappedCashback(amount: 1000, category: .dining, location: .hk, date: endOfLastYear, paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(lastYearCashback, 10.0, accuracy: 0.0001) // 基础 10 + 餐饮加成 0 (已达上限 20)
+        
+        // 今年年初刷，额度应当重置
+        let thisYearCashback = card.calculateCappedCashback(amount: 1000, category: .dining, location: .hk, date: startOfThisYear, paymentMethod: .offline, transactionToExclude: nil)
+        XCTAssertEqual(thisYearCashback, 30.0, accuracy: 0.0001) // 基础 10 + 餐饮加成(1000*0.05 = 50 -> 封顶 20) = 30
     }
 
     // MARK: - 5. 积分计算

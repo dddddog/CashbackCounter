@@ -178,7 +178,7 @@ class ImageDownloadManager: NSObject, ObservableObject {
                     
                     return data
                 } catch {
-                    print("❌ [ImageDownloadManager] 下载数据失败: \(error.localizedDescription)")
+                    print("❌ [ImageDownloadManager] \(AppError.networkFailure(underlying: error).localizedDescription)")
                     return nil
                 }
                 

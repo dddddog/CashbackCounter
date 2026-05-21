@@ -40,9 +40,14 @@ struct CashbackService {
 
 // Convert string to date
 extension String {
+    private static let _dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
     func toDate() -> Date {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd" // 必须符合这个格式
-        return formatter.date(from: self) ?? Date() // 如果格式错了就返回今天
+        Self._dateFormatter.date(from: self) ?? Date() // 如果格式错了就返回今天
     }
 }

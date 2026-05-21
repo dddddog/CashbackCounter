@@ -258,11 +258,11 @@ struct EmbeddedTransactionListView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical)
                 .background(Color(uiColor: .secondarySystemGroupedBackground))
-                .cornerRadius(12)
+                .cornerRadius(DesignConstants.CornerRadius.large)
                 .padding(.horizontal, 16)
                 
             } else {
-                LazyVStack(spacing: 15) {
+                LazyVStack(spacing: DesignConstants.Spacing.listItemSpacing) {
                     ForEach(sortedTransactions) { item in
                         TransactionRow(transaction: item)
                             .onTapGesture { selectedTransaction = item }

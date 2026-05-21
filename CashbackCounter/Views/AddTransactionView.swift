@@ -93,7 +93,7 @@ struct AddTransactionView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxHeight: 200)
-                                .cornerRadius(10)
+                                .cornerRadius(DesignConstants.CornerRadius.large)
                                 .opacity(viewModel.isAnalyzing ? 0.5 : 1.0)
                                 .onTapGesture {
                                     viewModel.showFullImage = true
@@ -103,7 +103,7 @@ struct AddTransactionView: View {
                                 ProgressView("AI 分析中...")
                                     .padding()
                                     .background(.ultraThinMaterial)
-                                    .cornerRadius(10)
+                                    .cornerRadius(DesignConstants.CornerRadius.large)
                             }
                         }
                         .sheet(isPresented: $viewModel.showFullImage){

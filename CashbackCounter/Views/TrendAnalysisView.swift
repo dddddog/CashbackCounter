@@ -123,13 +123,32 @@ struct TrendAnalysisView: View {
         return "\(formatter.string(from: start)) - \(formatter.string(from: end))"
     }
 
+    private var peakMonthData: MonthlyData? {
+        chartData.max(by: { $0.amount < $1.amount })
+    }
+
+    private func peakMonthLabel(for date: Date?) -> String {
+        guard let date else { return "暂无数据" }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale.current
+        formatter.dateFormat = "MM月峰值"
+        return formatter.string(from: date)
+    }
+
+    private func formattedCurrencyInteger(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = mainCurrencyCode
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: amount)) ?? ""
+    }
+
     private var highlightedData: MonthlyData? {
-        if let selectedDate {
-            return chartData.min(by: {
-                abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate))
-            })
-        }
-        return chartData.last
+        guard let selectedDate else { return nil }
+        return chartData.min(by: {
+            abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate))
+        })
     }
 
     private func formattedCurrency(_ amount: Double) -> String {
@@ -150,37 +169,45 @@ struct TrendAnalysisView: View {
             VStack(spacing: 20) {
                 
                 // --- 1. 图表区域 ---
-                VStack(alignment: .leading, spacing: 8) {
-                    Group {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
                         if let card = selectedCard {
-                            // 「招商银行 支出趋势」这种
                             Text("\(card.bankName) \(type.title)趋势")
                                 .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
                         } else {
-                            // 「总支出趋势」这种
                             Text("总\(type.title)趋势")
                                 .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
+                        }
+                        Spacer()
+                        if let highlighted = highlightedData {
+                            Text(highlighted.date, format: .dateTime.year().month())
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.top, 16)
                     
-                    // 动态颜色
-                    Text("近12个月累计: \(formattedCurrency(totalAmount))")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
-                        .foregroundColor(type.color) // 👇 使用类型颜色
-                        .padding(.bottom, 4)
-
-                    if !monthRangeText.isEmpty {
-                        Text("范围: \(monthRangeText)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
+                    // 三列式的数据仪表盘卡片网格
+                    HStack(spacing: 8) {
+                        statCard(
+                            title: "近12个月累计",
+                            value: formattedCurrencyInteger(totalAmount),
+                            subtitle: monthRangeText.isEmpty ? nil : monthRangeText,
+                            highlightColor: type.color
+                        )
+                        statCard(
+                            title: "月均水平",
+                            value: formattedCurrencyInteger(totalAmount / 12.0),
+                            subtitle: "月均\(type.title)"
+                        )
+                        statCard(
+                            title: "单月最高",
+                            value: formattedCurrencyInteger(peakMonthData?.amount ?? 0.0),
+                            subtitle: peakMonthLabel(for: peakMonthData?.date)
+                        )
                     }
+                    .padding(.horizontal)
                     
                     Chart {
                         ForEach(chartData) { item in
@@ -189,18 +216,19 @@ struct TrendAnalysisView: View {
                                 x: .value("月份", item.date, unit: .month),
                                 y: .value("金额", item.amount)
                             )
-                            .interpolationMethod(.catmullRom)
-                            .foregroundStyle(type.color) // 👇 使用类型颜色
-                            .lineStyle(StrokeStyle(lineWidth: 3))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(type.color.gradient)
+                            .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
                             
                             // 渐变填充
                             AreaMark(
                                 x: .value("月份", item.date, unit: .month),
                                 y: .value("金额", item.amount)
                             )
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [type.color.opacity(0.3), type.color.opacity(0.0)],
+                                    colors: [type.color.opacity(0.25), type.color.opacity(0.0)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
@@ -212,7 +240,7 @@ struct TrendAnalysisView: View {
                                 y: .value("金额", item.amount)
                             )
                             .foregroundStyle(type.color)
-                            .symbolSize(40)
+                            .symbolSize(16)
                         }
 
                         if let highlighted = highlightedData {
@@ -226,24 +254,28 @@ struct TrendAnalysisView: View {
                                 x: .value("月份", highlighted.date, unit: .month),
                                 y: .value("金额", highlighted.amount)
                             )
-                            .symbolSize(90)
+                            .symbolSize(80)
                             .foregroundStyle(type.color)
-                            .annotation(position: .top, alignment: .leading) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(highlighted.date, format: .dateTime.year().month())
-                                        .font(.caption)
+                            .annotation(position: .top, alignment: .center) {
+                                VStack(alignment: .center, spacing: 2) {
+                                    Text(highlighted.date, format: .dateTime.month(.abbreviated))
+                                        .font(.system(size: 10, weight: .semibold))
                                         .foregroundColor(.secondary)
                                     Text(formattedCurrency(highlighted.amount))
-                                        .font(.caption.bold())
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
                                         .foregroundColor(.primary)
                                 }
-                                .padding(8)
-                                .background(.regularMaterial)
-                                .cornerRadius(8)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(.regularMaterial)
+                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                )
                             }
                         }
                     }
-                    .frame(height: 260)
+                    .frame(height: 240)
                     .padding(.horizontal)
                     .padding(.bottom, 16)
                     .chartOverlay { proxy in
@@ -262,6 +294,11 @@ struct TrendAnalysisView: View {
                                                 selectedDate = date
                                             }
                                         }
+                                        .onEnded { _ in
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                selectedDate = nil
+                                            }
+                                        }
                                 )
                         }
                     }
@@ -272,22 +309,27 @@ struct TrendAnalysisView: View {
                             if let date = value.as(Date.self) {
                                 AxisValueLabel {
                                     Text(axisLabel(for: date))
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.system(size: 12, weight: .medium))
                                 }
                             }
                         }
                     }
-                    // Y轴：统一币种格式
+                    // Y轴：使用 compactName 紧凑表示以释放绘制区域宽度
                     .chartYAxis {
-                        AxisMarks { _ in
-                            AxisGridLine()
-                            AxisValueLabel(format: .currency(code: mainCurrencyCode))
-                                .font(.system(size: 13))
+                        AxisMarks(position: .leading) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                                .foregroundStyle(Color.secondary.opacity(0.15))
+                            if let amount = value.as(Double.self) {
+                                AxisValueLabel {
+                                    Text(amount.formatted(.currency(code: mainCurrencyCode).notation(.compactName)))
+                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                }
+                            }
                         }
                     }
                 }
                 .background(Color(uiColor: .secondarySystemGroupedBackground))
-                .cornerRadius(16)
+                .cornerRadius(DesignConstants.CornerRadius.extraLarge)
                 .padding(.horizontal)
                 
                 // --- 2. 卡片选择列表 ---
@@ -346,5 +388,38 @@ struct TrendAnalysisView: View {
                 }
             }
         }
+    }
+    
+    @ViewBuilder
+    private func statCard(title: String, value: String, subtitle: String? = nil, highlightColor: Color? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            
+            Text(value)
+                .font(.system(.title3, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundColor(highlightColor ?? .primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            } else {
+                Spacer().frame(height: 12)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(uiColor: .tertiarySystemGroupedBackground))
+        )
     }
 }

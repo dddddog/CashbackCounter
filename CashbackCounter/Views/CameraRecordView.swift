@@ -31,7 +31,7 @@ struct CameraRecordView: View {
                     .overlay(
                         VStack(spacing: 20) {
                             Image(systemName: "arrow.down.circle.fill")
-                                .font(.system(size: 80))
+                                .font(.system(size: DesignConstants.Size.dropIndicatorIcon))
                                 .foregroundColor(.white)
                             Text("松手导入图片")
                                 .font(.title2)
@@ -52,7 +52,7 @@ struct CameraRecordView: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.largeTitle)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
+                            .frame(width: DesignConstants.Size.cameraSideButton, height: DesignConstants.Size.cameraSideButton)
                             .background(Color.black.opacity(0.5))
                             .clipShape(Circle())
                     }
@@ -66,10 +66,10 @@ struct CameraRecordView: View {
                         ZStack {
                             Circle()
                                 .stroke(Color.white, lineWidth: 4)
-                                .frame(width: 70, height: 70)
+                                .frame(width: DesignConstants.Size.cameraButtonOuter, height: DesignConstants.Size.cameraButtonOuter)
                             Circle()
                                 .fill(Color.white)
-                                .frame(width: 60, height: 60)
+                                .frame(width: DesignConstants.Size.cameraButtonInner, height: DesignConstants.Size.cameraButtonInner)
                         }
                     }
                     
@@ -85,14 +85,14 @@ struct CameraRecordView: View {
                             Image(systemName: "square.and.pencil") // ✏️ 记账图标
                                 .font(.largeTitle)
                                 .foregroundColor(.white)
-                                .frame(width: 60, height: 60) // 保持和左边一样大，对称美
+                                .frame(width: DesignConstants.Size.cameraSideButton, height: DesignConstants.Size.cameraSideButton) // 保持和左边一样大，对称美
                                 .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
                         }
                     
                 }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 50)
+                .padding(.horizontal, DesignConstants.Spacing.bottomHorizontalPadding)
+                .padding(.bottom, DesignConstants.Spacing.bottomPadding)
             }
         }
         // 👇👇👇 核心修改：添加拖拽目标 👇👇👇

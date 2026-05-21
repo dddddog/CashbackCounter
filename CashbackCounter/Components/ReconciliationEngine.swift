@@ -12,7 +12,8 @@ struct ReconciliationEngine {
         let matched = imported.filter { importedTransaction in
             existing.contains { transaction in
                 amountsMatch(importedTransaction.billingAmount, transaction.billingAmount) &&
-                datesWithinRange(importedTransaction.transactionDate, transaction.date, calendar: calendar)
+                datesWithinRange(importedTransaction.transactionDate, transaction.date, calendar: calendar) &&
+                merchantsMatch(importedTransaction.merchant, transaction.merchant)
             }
         }
 
@@ -33,4 +34,12 @@ struct ReconciliationEngine {
         let dayDiff = calendar.dateComponents([.day], from: leftDay, to: rightDay).day ?? Int.max
         return abs(dayDiff) <= 3
     }
+
+    private func merchantsMatch(_ lhs: String, _ rhs: String) -> Bool {
+        let normalizedLhs = lhs.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedRhs = rhs.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedLhs.isEmpty, !normalizedRhs.isEmpty else { return false }
+        return normalizedLhs.contains(normalizedRhs) || normalizedRhs.contains(normalizedLhs)
+    }
 }
+

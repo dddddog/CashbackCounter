@@ -22,9 +22,14 @@ class Income: Identifiable {
         self.platform = platform
         self.isReceived = isReceived
     }
+    private static let _dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
     var dateString: String {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd" // 你可以改成 "yyyy-MM-dd" 或 "MM月dd日"
-            return formatter.string(from: date)
-        }
+        Self._dateFormatter.string(from: date)
+    }
 }

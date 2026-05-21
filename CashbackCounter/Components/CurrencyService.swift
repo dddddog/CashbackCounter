@@ -39,9 +39,9 @@ struct CachedRates: Codable {
 struct CurrencyService {
 
     // --- 缓存配置 ---
-    private static let kRatesKey = "cached_exchange_rates" // 存汇率数据的 Key
-    private static let kDateKey = "last_fetch_date"        // 存上次更新时间的 Key
-    private static let kBaseKey = "last_rates_base"        // 存上次汇率基准币种
+    private static let kRatesKey = AppConfig.UserDefaultsKey.cachedExchangeRates // 存汇率数据的 Key
+    private static let kDateKey = AppConfig.UserDefaultsKey.lastFetchDate        // 存上次更新时间的 Key
+    private static let kBaseKey = AppConfig.UserDefaultsKey.lastRatesBase        // 存上次汇率基准币种
     
     // --- 🚀 智能入口：获取汇率 ---
     // View 层只调用这个方法，不需要关心内部逻辑
@@ -69,7 +69,7 @@ struct CurrencyService {
             saveRatesLocally(normalized, base: base)
             return normalized
         } catch {
-            print("❌ 网络请求失败: \(error)")
+            print("❌ \(AppError.networkFailure(underlying: error).localizedDescription)")
             if let cached = loadLocalRates(), cached.base.caseInsensitiveCompare(base) == .orderedSame {
                 return cached.rates
             }
@@ -79,7 +79,7 @@ struct CurrencyService {
 
     // --- 内部方法：联网下载 (私有) ---
     private static func fetchRemoteRates(base: String) async throws -> [String: Double] {
-        let urlString = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/\(base.lowercased()).json"
+        let urlString = "\(AppConfig.currencyAPIBaseURL)\(base.lowercased()).json"
         guard let url = URL(string: urlString) else { return [:] }
 
         let (data, _) = try await URLSession.shared.data(from: url)

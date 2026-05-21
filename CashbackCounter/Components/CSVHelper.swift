@@ -80,6 +80,25 @@ struct CSVHelper {
         
         let categoryMap: [String: Category] = Dictionary(uniqueKeysWithValues: Category.allCases.map { ($0.displayName, $0) })
         let regionMap: [String: Region] = Dictionary(uniqueKeysWithValues: Region.allCases.map { ($0.rawValue, $0) })
+        
+        // 去重：预先构建已有交易的指纹映射，避免重复导入，同时保证返回的数组索引与 CSV 匹配
+        let existingTransactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        var existingTxMap: [String: Transaction] = [:]
+        let deduplicationDateFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            return f
+        }()
+        for tx in existingTransactions {
+            let merchant = tx.merchant.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let dayString = deduplicationDateFormatter.string(from: tx.date)
+            let amount = String(format: "%.2f", tx.amount)
+            let billing = String(format: "%.2f", tx.billingAmount)
+            existingTxMap["\(merchant)|\(dayString)|\(amount)|\(billing)"] = tx
+        }
+        
+        var skippedCount = 0
         var logicalIndex = 0
         for (index, row) in rows.enumerated() {
             if index == 0 || row.trimmingCharacters(in: .whitespaces).isEmpty { continue }
@@ -97,6 +116,14 @@ struct CSVHelper {
             let cardNameRaw = cleanCSVField(columns[6])
             let cardEndNum = columns[7]
             let regionName = columns[8]
+            
+            // 去重检查：如果数据库中已有相同交易，将已有交易放入数组以保持索引对齐，并跳过插入
+            let dedupKey = "\(merchant.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())|\(dateStr)|\(String(format: "%.2f", amount))|\(String(format: "%.2f", billing))"
+            if let existingTx = existingTxMap[dedupKey] {
+                skippedCount += 1
+                createdTransactions.append(existingTx)
+                continue
+            }
             
             // 👇 新增：解析支付方式 (第10列，索引9)
             // 兼容旧版 CSV：如果列数不够，或者读出来是空的，就默认 .offline
@@ -159,6 +186,11 @@ struct CSVHelper {
             
             context.insert(newTransaction)
             createdTransactions.append(newTransaction)
+            existingTxMap[dedupKey] = newTransaction // 防止 CSV 内部重复
+        }
+        
+        if skippedCount > 0 {
+            print("📋 CSV 导入去重：跳过了 \(skippedCount) 条已存在的交易")
         }
         return createdTransactions
     }

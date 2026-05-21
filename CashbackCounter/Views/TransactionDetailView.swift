@@ -97,7 +97,7 @@ struct TransactionDetailView: View {
                         .padding(.vertical, 4)
                         .padding(.horizontal, 8)
                         .background(transaction.paymentMethod.color.opacity(0.1))
-                        .cornerRadius(6)
+                        .cornerRadius(DesignConstants.CornerRadius.small)
                     }
                     
                     // 支付卡片

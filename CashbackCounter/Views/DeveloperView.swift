@@ -78,16 +78,16 @@ struct DeveloperView: View {
                     .padding(.vertical, 4)
                 }
                 Section(header: Text("项目")) {
-                    Link(destination: URL(string: "https://github.com/raytracingon/cashbackcounter")!) {
+                    Link(destination: AppConfig.githubRepoURL) {
                         Label("Cashback Counter 仓库", systemImage: "shippingbox")
                     }
                 }
 
                 Section(header: Text("致谢")) {
-                    Link(destination: URL(string: "https://github.com/HarukaKinen/Cardentify")!) {
+                    Link(destination: AppConfig.cardentifyRepoURL) {
                         Label("调用卡面库 Cardentify", systemImage: "shippingbox")
                     }
-                    Link(destination: URL(string: "https://github.com/fawazahmed0/exchange-api")!) {
+                    Link(destination: AppConfig.exchangeAPIRepoURL) {
                         Label("调用货币费率数据库 exchange-api", systemImage: "shippingbox")
                     }
                 }

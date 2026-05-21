@@ -186,27 +186,36 @@
       }
     },
     "%lld 个计划" : {
-
-    },
-    "• 分享导出：仅当你主动使用“导出”功能时，数据才会通过系统导出面板离开应用。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Export sharing: Data leaves the app only when you actively use the \"Export\" feature via the system export panel."
+            "value" : "%lld Plans"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• 分享匯出：僅當你主動使用「匯出」功能時，資料才會透過系統匯出面板離開應用。"
+            "value" : "%lld 個計劃"
           }
         }
       }
     },
     "• 分享导出：仅当你主动使用导出功能时，数据才会通过系统导出面板离开应用。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Export sharing: Data leaves the app only when you actively use the export feature via the system export panel."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 分享匯出：僅當你主動使用匯出功能時，資料才會透過系統匯出面板離開應用。"
+          }
+        }
+      }
     },
     "• 数据存储：账单、卡片、积分等数据全部保存在你的设备本地，我们不上传任何个人数据。" : {
       "localizations" : {
@@ -225,7 +234,20 @@
       }
     },
     "• 更新前建议使用全部数据导出进行备份！！！（重要）。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• It is highly recommended to export all data for backup before updating!!! (Important)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 更新前建議使用全部資料匯出進行備份！！！（重要）。"
+          }
+        }
+      }
     },
     "• 更新后首次打开可能需要短暂时间完成数据整理。" : {
       "localizations" : {
@@ -510,10 +532,36 @@
       }
     },
     "iCloud 数据同步" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Data Sync"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 資料同步"
+          }
+        }
+      }
     },
     "iCloud 数据同步设置已更改。请完全退出应用并重新启动，以使新的同步配置生效。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud data sync settings have changed. Please force quit the app and restart it for the new sync configuration to take effect."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 資料同步設定已更改。請完全退出應用程式並重新啟動，以使新的同步設定生效。"
+          }
+        }
+      }
     },
     "Matched: %lld items" : {
       "localizations" : {
@@ -1119,13 +1167,52 @@
       }
     },
     "例如：兑换机票" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g., Redeem flight tickets"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：兌換機票"
+          }
+        }
+      }
     },
     "例如：开卡奖励 50000 分" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g., Sign-up bonus 50,000 points"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：開卡獎勵 50000 分"
+          }
+        }
+      }
     },
     "例如：积分每年清零" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g., Points expire annually"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：積分每年清零"
+          }
+        }
+      }
     },
     "保存" : {
       "localizations" : {
@@ -1618,10 +1705,36 @@
       }
     },
     "同步设置已更改" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Settings Changed"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步設定已更改"
+          }
+        }
+      }
     },
     "启用中" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabling"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "啟用中"
+          }
+        }
+      }
     },
     "商户名称 (例如：星巴克)" : {
       "localizations" : {
@@ -1646,7 +1759,20 @@
       }
     },
     "在登录相同 Apple ID 的设备间自动同步" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatically sync between devices logged into the same Apple ID"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在登入相同 Apple ID 的裝置間自動同步"
+          }
+        }
+      }
     },
     "基本信息" : {
       "localizations" : {
@@ -1671,10 +1797,36 @@
       }
     },
     "备注" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備註"
+          }
+        }
+      }
     },
     "备注（可选）" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes (Optional)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備註（選填）"
+          }
+        }
+      }
     },
     "外观与语言" : {
       "localizations" : {
@@ -1721,7 +1873,20 @@
       }
     },
     "好的" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的"
+          }
+        }
+      }
     },
     "实际扣款" : {
       "localizations" : {
@@ -2116,6 +2281,12 @@
             "state" : "translated",
             "value" : "开始使用"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始使用"
+          }
         }
       }
     },
@@ -2184,7 +2355,20 @@
       }
     },
     "总等值价值" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total Equivalent Value"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總等值價值"
+          }
+        }
+      }
     },
     "总返现" : {
       "localizations" : {
@@ -2241,7 +2425,20 @@
       }
     },
     "手动添加" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Manually"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手動添加"
+          }
+        }
+      }
     },
     "手动添加积分" : {
       "localizations" : {
@@ -2298,7 +2495,20 @@
       }
     },
     "按 %@ 计价" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Priced in %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 %@ 計價"
+          }
+        }
+      }
     },
     "按年" : {
       "localizations" : {
@@ -2527,7 +2737,20 @@
       }
     },
     "新台币（TWD）" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Taiwan Dollar (TWD)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新台幣（TWD）"
+          }
+        }
+      }
     },
     "新增积分计划" : {
       "localizations" : {
@@ -2692,7 +2915,20 @@
       }
     },
     "暂无积分变动记录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No points transaction records"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暫無積分變動記錄"
+          }
+        }
+      }
     },
     "暂无积分库" : {
       "localizations" : {
@@ -2959,7 +3195,20 @@
       }
     },
     "欧元（EUR）" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euro (EUR)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歐元（EUR）"
+          }
+        }
+      }
     },
     "正在下载卡面..." : {
       "localizations" : {
@@ -3048,7 +3297,20 @@
       }
     },
     "汇率获取中" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetching exchange rates..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯率取得中"
+          }
+        }
+      }
     },
     "浅色模式" : {
       "localizations" : {
@@ -3243,7 +3505,20 @@
       }
     },
     "添加积分计划" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Points Plan"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加積分計劃"
+          }
+        }
+      }
     },
     "清除" : {
       "localizations" : {
@@ -3316,13 +3591,26 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "貢獻者"
+            "value" : "港幣 (HKD)"
           }
         }
       }
     },
     "澳门币（MOP)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macau Pataca (MOP)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "澳門幣（MOP)"
+          }
+        }
+      }
     },
     "版本" : {
       "localizations" : {
@@ -3347,7 +3635,20 @@
       }
     },
     "状态" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "狀態"
+          }
+        }
+      }
     },
     "短信全文" : {
       "localizations" : {
@@ -3508,7 +3809,20 @@
       }
     },
     "积分变动明细" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points Transaction Details"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "積分變動明細"
+          }
+        }
+      }
     },
     "积分名称" : {
       "localizations" : {
@@ -3685,7 +3999,20 @@
       }
     },
     "类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "類型"
+          }
+        }
+      }
     },
     "结单分析" : {
       "localizations" : {
@@ -3731,6 +4058,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "继续"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續"
           }
         }
       }
@@ -3942,10 +4275,20 @@
       }
     },
     "英镑（GBP）" : {
-
-    },
-    "范围: %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "British Pound (GBP)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英鎊（GBP）"
+          }
+        }
+      }
     },
     "解析中..." : {
       "localizations" : {
@@ -4196,7 +4539,20 @@
       }
     },
     "调整类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjustment Type"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整類型"
+          }
+        }
+      }
     },
     "调用卡面库 Cardentify" : {
       "localizations" : {
@@ -4319,6 +4675,12 @@
             "state" : "translated",
             "value" : "跳过"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳過"
+          }
         }
       }
     },
@@ -4339,6 +4701,7 @@
       }
     },
     "近12个月累计: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4403,7 +4766,20 @@
       }
     },
     "选中月份" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected Month"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選中月份"
+          }
+        }
+      }
     },
     "选择信用卡" : {
       "localizations" : {
@@ -4668,7 +5044,20 @@
       }
     },
     "预估" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預估"
+          }
+        }
+      }
     },
     "预计积分价值" : {
       "localizations" : {

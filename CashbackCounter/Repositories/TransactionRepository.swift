@@ -41,7 +41,7 @@ final class SwiftDataTransactionRepository: TransactionRepository {
 
     func fetchForCard(_ card: CreditCard) -> [Transaction] {
         let allTransactions = fetchAll()
-        return allTransactions.filter { $0.card === card }
+        return allTransactions.filter { $0.card?.persistentModelID == card.persistentModelID }
     }
 
     func insert(_ transaction: Transaction) {

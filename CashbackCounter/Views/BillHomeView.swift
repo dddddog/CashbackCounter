@@ -126,7 +126,7 @@ struct BillHomeContentView: View {
 
     @ViewBuilder
     private var statsBar: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: DesignConstants.Spacing.statsSpacing) {
             // 支出统计 -> 红色趋势图
             Button(action: { viewModel.showExpenseSheet = true }) {
                 StatBox(
@@ -163,7 +163,7 @@ struct BillHomeContentView: View {
 
     @ViewBuilder
     private var transactionList: some View {
-        LazyVStack(spacing: 15) {
+        LazyVStack(spacing: DesignConstants.Spacing.listItemSpacing) {
             ForEach(filteredTransactions) { item in
                 VStack(alignment: .leading, spacing: 8) {
                     TransactionRow(transaction: item, exchangeRates: viewModel.exchangeRates)
@@ -212,7 +212,7 @@ struct BillHomeContentView: View {
                 Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: DesignConstants.Spacing.sectionSpacing) {
                         
                         // 1. 统计条 (点击数字可查看趋势)
                         statsBar
@@ -232,10 +232,12 @@ struct BillHomeContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        // 导出
-                        if !filteredTransactions.isEmpty,
-                           let receiptsZipURL = filteredTransactions.exportReceiptsZip() {
-                            ShareLink(items: [receiptsZipURL]) {
+                        // 导出（延迟到按钮点击时才生成 ZIP，避免在视图构建时阻塞主线程）
+                        if !filteredTransactions.isEmpty {
+                            Button {
+                                let transactions = filteredTransactions
+                                viewModel.exportedFileURL = transactions.exportReceiptsZip()
+                            } label: {
                                 Label("导出账单", systemImage: "square.and.arrow.up")
                             }
                         }
@@ -248,8 +250,16 @@ struct BillHomeContentView: View {
                             Label("导入结单", systemImage: "chart.bar.doc.horizontal.fill")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle").font(.system(size: 18))
+                        Image(systemName: "ellipsis.circle").font(.system(size: DesignConstants.FontSize.toolbarIcon))
                     }
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { viewModel.exportedFileURL != nil },
+                set: { if !$0 { viewModel.exportedFileURL = nil } }
+            )) {
+                if let url = viewModel.exportedFileURL {
+                    ActivityViewController(activityItems: [url])
                 }
             }
 
@@ -332,10 +342,10 @@ struct FilterChip: View {
             Text(title)
         }
         .font(.subheadline)
-        .padding(.horizontal, 10).padding(.vertical, 5)
+        .padding(.horizontal, DesignConstants.Spacing.chipSpacing).padding(.vertical, 5)
         .background(isSelected ? Color.blue : Color.clear)
         .foregroundColor(isSelected ? .white : .blue)
-        .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue, lineWidth: 1))
+        .cornerRadius(DesignConstants.CornerRadius.medium)
+        .overlay(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.medium).stroke(Color.blue, lineWidth: 1))
     }
 }

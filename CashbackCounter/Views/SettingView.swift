@@ -52,10 +52,10 @@ struct SettingsView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.blue.opacity(0.1))
-                                .frame(width: 80, height: 80)
+                            .frame(width: DesignConstants.Size.settingsIconCircle, height: DesignConstants.Size.settingsIconCircle)
                             
                             Image(systemName: "creditcard.fill")
-                                .font(.system(size: 40))
+                                .font(.system(size: DesignConstants.Size.settingsIconFont))
                                 .foregroundColor(.blue)
                                 .offset(x: -5, y: 0)
                             

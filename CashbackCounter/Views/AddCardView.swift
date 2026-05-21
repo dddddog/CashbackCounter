@@ -198,7 +198,7 @@ struct AddCardView: View {
                                     .frame(width: 50)
                                     .padding(4)
                                     .background(Color(uiColor: .secondarySystemBackground))
-                                    .cornerRadius(5)
+                                    .cornerRadius(DesignConstants.CornerRadius.small)
                                 Text("%")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -215,7 +215,7 @@ struct AddCardView: View {
                                     .frame(width: 60)
                                     .padding(4)
                                     .background(Color(uiColor: .secondarySystemBackground))
-                                    .cornerRadius(5)
+                                    .cornerRadius(DesignConstants.CornerRadius.small)
                             }
                         }
                         .padding(.vertical, 4)
@@ -255,7 +255,7 @@ struct AddCardView: View {
             // 2. 监听下载完成，将图片转为 Data
             .onChange(of: imageManager.downloadedImage) { _, newImage in
                 if let image = newImage {
-                    viewModel.cardImageData = image.jpegData(compressionQuality: 0.7)
+                    viewModel.cardImageData = image.jpegData(compressionQuality: AppConfig.receiptJPEGQuality)
                 }
             }
             .onChange(of: viewModel.rewardType) { _, newValue in
@@ -289,7 +289,7 @@ struct AddCardView: View {
                         .frame(width: 40)
                         .padding(5)
                         .background(Color(uiColor: .secondarySystemBackground))
-                        .cornerRadius(5)
+                        .cornerRadius(DesignConstants.CornerRadius.small)
                     
                     Text(capUnit == "积分" ? "积分上限" : "上限")
                         .font(.caption).foregroundColor(.gray)
@@ -299,7 +299,7 @@ struct AddCardView: View {
                         .frame(width: 60)
                         .padding(5)
                         .background(Color(uiColor: .secondarySystemBackground))
-                        .cornerRadius(5)
+                        .cornerRadius(DesignConstants.CornerRadius.small)
                 }
             }
             .padding(.vertical, 4)

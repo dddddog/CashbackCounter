@@ -22,7 +22,7 @@ struct ContentView: View {
             
             CardListView()
                 .tabItem {
-                    Image(systemName: selectedTab == 2 ? "creditcard.fill" : "creditcard")
+                    Image(systemName: selectedTab == 1 ? "creditcard.fill" : "creditcard")
                     Text("卡包")
                 }
                 .tag(1)
@@ -56,7 +56,7 @@ struct ContentView: View {
             do {
                 try Point.syncDefaultPoints(in: context)
             } catch {
-                print("Failed to sync point templates: \(error)")
+                print("❌ \(AppError.networkFailure(underlying: error).localizedDescription)")
             }
         }
         .fullScreenCover(

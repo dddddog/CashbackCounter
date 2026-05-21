@@ -278,7 +278,7 @@ private struct PointSummaryCard: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
-        .cornerRadius(18)
+        .cornerRadius(DesignConstants.CornerRadius.pill)
         .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
     }
 

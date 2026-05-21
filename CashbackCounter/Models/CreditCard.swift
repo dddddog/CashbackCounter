@@ -356,98 +356,9 @@ class CreditCard: Identifiable {
         
         return (points: pointsEarned, value: value)
     }
-    func calculateCappedCashback(amount: Double, category: Category, location: Region, date: Date) -> Double {
-            
-            let isForeign = (location != issueRegion)
-            
-            // --- 第一步：准备费率和当笔理论值 ---
-            
-            // 1. 基础部分 (Base)
-            var baseRate = defaultRate
-            if isForeign, let fr = foreignCurrencyRate, fr > 0 {
-                baseRate = fr
-            }
-            let potentialBaseReward = amount * baseRate
-            
-            // 2. 加成部分 (Bonus)
-            let bonusRate = specialRates[category] ?? 0.0
-            let potentialBonusReward = amount * bonusRate
-            
-            // --- 第二步：准备上限阈值 ---
-            
-            let baseCapLimit = isForeign ? foreignBaseCap : localBaseCap
-            let categoryCapLimit = categoryCaps[category] ?? 0.0
-            
-            // --- 第三步：统计历史用量 (关键) ---
-            // 我们需要计算“当前结算周期已经产生了多少理论返现”，来看看是否触发上限
-            
-            let calendar = Calendar.current
-            let currentYear = calendar.component(.year, from: date)
-            let currentMonth = calendar.component(.month, from: date)
-            
-            // 筛选当前结算周期内的所有交易
-            let periodTransactions = (transactions ?? []).filter { t in
-                let year = calendar.component(.year, from: t.date)
-                guard year == currentYear else { return false }
-                
-                switch capPeriod {
-                case .yearly:
-                    // 同一年即可
-                    return true
-                case .monthly:
-                    let month = calendar.component(.month, from: t.date)
-                    return month == currentMonth
-                }
-            }
-            
-            // A. 计算已用的“基础额度”
-            // 规则：只累加“同区域类型”(本币vs外币) 的交易产生的“基础返现”
-            var usedBase: Double = 0
-            if baseCapLimit > 0 {
-                usedBase = periodTransactions
-                    .filter { ($0.location != self.issueRegion) == isForeign } // 筛选同区域
-                    .reduce(0) { sum, t in
-                        // 估算历史交易的基础返现 (Spend * BaseRate)
-                        // 注意：这里假设历史费率没变，用当前费率估算
-                        let tBaseRate = ((t.location != self.issueRegion) && (foreignCurrencyRate ?? 0) > 0) ? (foreignCurrencyRate ?? 0) : defaultRate
-                        return sum + (t.billingAmount * tBaseRate)
-                    }
-            }
-            
-            // B. 计算已用的“类别加成额度”
-            // 规则：累加“同类别”的交易产生的“加成返现” (不管它是在哪里消费的，因为是共用池)
-            var usedBonus: Double = 0
-            if categoryCapLimit > 0 {
-                usedBonus = periodTransactions
-                    .filter { $0.category == category } // 筛选同类别
-                    .reduce(0) { sum, t in
-                        // 估算历史交易的加成返现
-                        let tBonusRate = specialRates[t.category] ?? 0.0
-                        return sum + (t.billingAmount * tBonusRate)
-                    }
-            }
-            
-            // --- 第四步：结算 ---
-            
-            // 1. 结算基础部分
-            var finalBase = potentialBaseReward
-            if baseCapLimit > 0 {
-                let remaining = max(0, baseCapLimit - usedBase)
-                finalBase = min(potentialBaseReward, remaining)
-            }
-            
-            // 2. 结算加成部分
-            var finalBonus = potentialBonusReward
-            if categoryCapLimit > 0 {
-                let remaining = max(0, categoryCapLimit - usedBonus)
-                finalBonus = min(potentialBonusReward, remaining)
-            }
-            
-            // --- 第五步：相加返回 ---
-            return finalBase + finalBonus
-    }
     
 }
+
 
 // 👇 必须加这个 Extension 才能让颜色和字符串互转
 extension Color {

@@ -45,42 +45,101 @@ struct CardTemplate: Identifiable, Codable, Hashable {
         return parts.joined(separator: "|")
     }
 
-    func applyRules(to card: CreditCard, pointMap: [String: Point]) {
-        card.bankName = bankName
-        card.type = type
-        card.colorHexes = colors
-        card.issueRegion = region
+    @discardableResult
+    func applyRules(to card: CreditCard, pointMap: [String: Point]) -> Bool {
+        var modified = false
         
-        card.specialRates = Dictionary(uniqueKeysWithValues: specialRate.map { ($0.key, $0.value / 100.0) })
-        card.paymentMethodRates = Dictionary(uniqueKeysWithValues: paymentMethodRates.map { ($0.key, $0.value / 100.0) })
-
-        card.rewardType = rewardType
-        if let pointProgramKey {
-            card.pointProgram = pointMap[pointProgramKey]
-        } else {
-            card.pointProgram = nil
+        if card.bankName != bankName {
+            card.bankName = bankName
+            modified = true
+        }
+        if card.type != type {
+            card.type = type
+            modified = true
+        }
+        if card.colorHexes != colors {
+            card.colorHexes = colors
+            modified = true
+        }
+        if card.issueRegion != region {
+            card.issueRegion = region
+            modified = true
+        }
+        
+        let newSpecialRates = Dictionary(uniqueKeysWithValues: specialRate.map { ($0.key, $0.value / 100.0) })
+        if card.specialRates != newSpecialRates {
+            card.specialRates = newSpecialRates
+            modified = true
+        }
+        
+        let newPaymentRates = Dictionary(uniqueKeysWithValues: paymentMethodRates.map { ($0.key, $0.value / 100.0) })
+        if card.paymentMethodRates != newPaymentRates {
+            card.paymentMethodRates = newPaymentRates
+            modified = true
         }
 
-        card.defaultRate = defaultRate / 100.0
-        card.foreignCurrencyRate = foreignCurrencyRate.map { $0 / 100.0 }
+        if card.rewardType != rewardType {
+            card.rewardType = rewardType
+            modified = true
+        }
         
-        card.localBaseCap = localBaseCap
-        card.foreignBaseCap = foreignBaseCap
-        card.categoryCaps = categoryCaps
-        card.paymentCaps = paymentCaps
+        let targetPoint = pointProgramKey.flatMap { pointMap[$0] }
+        if card.pointProgram != targetPoint {
+            card.pointProgram = targetPoint
+            modified = true
+        }
+
+        let newDefaultRate = defaultRate / 100.0
+        if card.defaultRate != newDefaultRate {
+            card.defaultRate = newDefaultRate
+            modified = true
+        }
         
-        card.capPeriod = capPeriod
-        card.templateKey = templateKey
-        if let source = pictureURL {
-            Task {
-                if let data = await ImageDownloadManager.shared.downloadImageData(from: source) {
-                    await MainActor.run {
-                        withAnimation {
-                            card.cardImageData = data
+        let newForeignRate = foreignCurrencyRate.map { $0 / 100.0 }
+        if card.foreignCurrencyRate != newForeignRate {
+            card.foreignCurrencyRate = newForeignRate
+            modified = true
+        }
+        
+        if card.localBaseCap != localBaseCap {
+            card.localBaseCap = localBaseCap
+            modified = true
+        }
+        if card.foreignBaseCap != foreignBaseCap {
+            card.foreignBaseCap = foreignBaseCap
+            modified = true
+        }
+        if card.categoryCaps != categoryCaps {
+            card.categoryCaps = categoryCaps
+            modified = true
+        }
+        if card.paymentCaps != paymentCaps {
+            card.paymentCaps = paymentCaps
+            modified = true
+        }
+        if card.capPeriod != capPeriod {
+            card.capPeriod = capPeriod
+            modified = true
+        }
+        if card.templateKey != templateKey {
+            card.templateKey = templateKey
+            modified = true
+        }
+        
+        if let source = pictureURL, !source.isEmpty {
+            if card.cardImageData == nil {
+                Task {
+                    if let data = await ImageDownloadManager.shared.downloadImageData(from: source) {
+                        await MainActor.run {
+                            withAnimation {
+                                card.cardImageData = data
+                            }
                         }
                     }
                 }
             }
         }
+        
+        return modified
     }
 }
