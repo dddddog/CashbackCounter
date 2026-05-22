@@ -15,7 +15,8 @@ final class CashbackCounterTests: XCTestCase {
         try super.setUpWithError()
 
         let schema = Schema([CreditCard.self, Transaction.self, Point.self, PointAdjustment.self, Income.self])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".sqlite")
+        let config = ModelConfiguration(url: url, cloudKitDatabase: .none)
         container = try ModelContainer(for: schema, configurations: [config])
         context = ModelContext(container)
     }

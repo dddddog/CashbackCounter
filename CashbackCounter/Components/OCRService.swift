@@ -37,41 +37,25 @@ struct OCRService {
         // 直接用该地区的优化语言进行一次精准识别，省流且快。
         if let userRegion = region {
             print("🎯 用户已指定地区: \(userRegion.rawValue)，直接进行精准识别")
-            let rawText = await recognizeText(from: image, languages: getLanguages(for: userRegion))
+            let rawText = await recognizeTextInRows(from: image, languages: getLanguages(for: userRegion))
             return try? await aiParser.parse(text: rawText)
         }
         
-        // 🟠 情况 B：用户没选地区 (默认模式) -> 启动“本地推断 + 双重扫描”策略
-        print("🔍 未指定地区，启动第一轮：通用探索模式...")
+        // 🟠 情况 B：用户没选地区 (默认模式) -> 启动“本地推断 + 单次高精度扫描”策略
+        print("🔍 未指定地区，启动通用探索模式...")
         
-        // 1. 第一轮 OCR：使用通用语言列表
+        // 1. OCR：使用通用语言列表
         let broadLanguages = ["zh-Hans", "en-US", "ja-JP", "zh-Hant"]
-        let firstPassText = await recognizeText(from: image, languages: broadLanguages)
-        print(firstPassText)
+        let rawText = await recognizeTextInRows(from: image, languages: broadLanguages)
+        print(rawText)
         
-        // 2. ⚡️ 本地快速推断 (不调 AI，只查关键词)
-        let detectedRegion = simpleInferRegion(from: firstPassText)
+        // 2. ⚡️ 本地快速推断 (辅助诊断信息，已移除多余的第二轮 OCR)
+        let detectedRegion = simpleInferRegion(from: rawText)
         print("⚡️ 本地推断地区: \(detectedRegion?.rawValue ?? "未知")")
-
-        var finalText = firstPassText
         
-        // 3. 决策：需要重扫吗？
-        if let targetRegion = detectedRegion {
-            // 如果推断出了特定地区，为了保证准确率（特别是日语片假名），用专用语言包重扫
-            print("🔄 启动第二轮：针对 \(targetRegion.rawValue) 的精准识别...")
-            
-            let optimizedLanguages = getLanguages(for: targetRegion)
-            // 只有当优化后的语言列表跟通用列表不一样时，才值得重扫
-            if optimizedLanguages != broadLanguages {
-                finalText = await recognizeText(from: image, languages: optimizedLanguages)
-            }
-        }else{
-            
-        }
-        
-        // 4. 最终只调用一次 AI
+        // 3. 最终只调用一次 AI
         print("🤖以此文本请求 AI 分析...")
-        return try? await aiParser.parse(text: finalText)
+        return try? await aiParser.parse(text: rawText)
     }
     
     // MARK: - 🕵️‍♂️ 本地侦探：根据文字猜地区
@@ -86,9 +70,9 @@ struct OCRService {
         if upperText.contains("NZD") { return .nz }
         if upperText.contains("CNY") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
         if upperText.contains("USD") { return .us }
-        if upperText.contains("MOP") || upperText.contains("macau") { return .mo }
+        if upperText.contains("MOP") || upperText.contains("MACAU") { return .mo }
         if upperText.contains("EUR") || upperText.contains("EURO") || upperText.contains("€"){ return .other }
-        if upperText.contains("GBP") || upperText.contains("uk") || upperText.contains("£") { return .uk }
+        if upperText.contains("GBP") || upperText.contains("UK") || upperText.contains("£") { return .uk }
         
         // 2. 弱特征：看地名或特殊符号 (如果货币没找到)
         if upperText.contains("合計") || upperText.contains("料金") { return .jp }
@@ -121,23 +105,31 @@ struct OCRService {
     }
     
     // MARK: - Vision 基础能力 (不变)
+    static func recognizeTextInRows(from image: UIImage, languages: [String]) async -> String {
+        let observations = await recognizeObservations(from: image, languages: languages)
+        let rows = reconstructRows(from: observations)
+        return rows.map { $0.text }.joined(separator: "\n")
+    }
+    
     static func recognizeText(from image: UIImage, languages: [String]) async -> String {
         guard let cgImage = image.cgImage else { return "" }
         let orientation = cgImageOrientation(from: image.imageOrientation)
         
         return await withCheckedContinuation { continuation in
-            let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
-            let request = VNRecognizeTextRequest { request, error in
-                guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
-                    continuation.resume(returning: "")
-                    return
+            Task.detached {
+                let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
+                let request = VNRecognizeTextRequest { request, error in
+                    guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
+                        continuation.resume(returning: "")
+                        return
+                    }
+                    let fullText = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+                    continuation.resume(returning: fullText)
                 }
-                let fullText = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-                continuation.resume(returning: fullText)
+                request.recognitionLevel = .accurate
+                request.recognitionLanguages = languages
+                try? requestHandler.perform([request])
             }
-            request.recognitionLevel = .accurate
-            request.recognitionLanguages = languages
-            try? requestHandler.perform([request])
         }
     }
 
@@ -146,17 +138,19 @@ struct OCRService {
         let orientation = cgImageOrientation(from: image.imageOrientation)
 
         return await withCheckedContinuation { continuation in
-            let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
-            let request = VNRecognizeTextRequest { request, error in
-                guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
-                    continuation.resume(returning: [])
-                    return
+            Task.detached {
+                let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
+                let request = VNRecognizeTextRequest { request, error in
+                    guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    continuation.resume(returning: observations)
                 }
-                continuation.resume(returning: observations)
+                request.recognitionLevel = .accurate
+                request.recognitionLanguages = languages
+                try? requestHandler.perform([request])
             }
-            request.recognitionLevel = .accurate
-            request.recognitionLanguages = languages
-            try? requestHandler.perform([request])
         }
     }
 
