@@ -141,7 +141,7 @@ struct SettingsView: View {
                     }
                     
                     NavigationLink(destination: ShortcutGuideView()) {
-                        Label("操作按钮配置教程", systemImage: "book.pages")
+                        Label("自动化配置教程", systemImage: "book.pages")
                     }
                 }
                 
@@ -315,59 +315,85 @@ struct ActivityViewController: UIViewControllerRepresentable {
 private struct ShortcutGuideView: View {
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("通过搭配 iPhone 的操作按钮 (Action Button)，你可以实现一键截屏并自动调用 Cashback Counter 进行智能记账。")
-                    .foregroundColor(.secondary)
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("第一步：获取快捷指令")
-                        .font(.headline)
-                    Text("点击下方按钮，将预设的快捷指令添加到你的系统中。")
-                        .foregroundColor(.secondary)
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 24) {
+                // MARK: - 截屏记账
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("操作按钮一键截屏记账", systemImage: "camera.viewfinder")
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.blue)
                     
-                    Link(destination: URL(string: "https://www.icloud.com/shortcuts/aceb7bb680d74a99aaee23f2c9005089")!) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.down")
-                            Text("下载快捷指令")
+                    Text("通过搭配 iPhone 的操作按钮 (Action Button)，你可以实现在任何页面一键截屏并自动记账。")
+                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("1. 获取快捷指令")
+                            .font(.headline)
+                        
+                        Link(destination: URL(string: "https://www.icloud.com/shortcuts/aceb7bb680d74a99aaee23f2c9005089")!) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("下载截屏记账快捷指令")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                         }
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
                     }
-                    .padding(.top, 4)
-                }
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("第二步：配置操作按钮")
-                        .font(.headline)
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("1. 打开 iPhone 的「设置」应用", systemImage: "gear")
-                        Label("2. 找到「操作按钮」选项", systemImage: "button.programmable")
-                        Label("3. 左右滑动，选择「快捷指令」功能", systemImage: "hand.draw")
-                        Label("4. 点击选择刚才下载的「截屏智能记账」", systemImage: "checkmark.circle")
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                }
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("第三步：如何使用")
-                        .font(.headline)
-                    
-                    Text("在任何有消费凭证或账单的页面（如支付宝、微信支付完成页），长按 iPhone 侧边的操作按钮，系统会自动截取当前屏幕，并唤起 App 进行 OCR 识别和记账。")
-                        .foregroundColor(.secondary)
+                        Text("2. 配置与使用")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• 打开 iPhone「设置」>「操作按钮」")
+                            Text("• 滑动选择「快捷指令」，选取刚下载的快捷指令")
+                            Text("• 在任何消费凭证页面，长按操作按钮即可自动截屏记账")
+                        }
                         .font(.subheadline)
+                        .foregroundColor(.primary)
+                    }
                 }
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                
+                // MARK: - 短信记账
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("信用卡短信自动记账", systemImage: "text.bubble")
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.green)
+                    
+                    Text("通过快捷指令的「自动化」功能，在收到银行扣款短信时可以自动后台记账，无需手动操作。")
+                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("配置步骤")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("1. 打开「快捷指令」App，切换到「自动化」标签")
+                            Text("2. 点击右上角「+」新建自动化，选择「信息」")
+                            Text("3. 在「发件人」处填入银行短信号码（如 95588）")
+                            Text("4. 勾选「立即运行」，点击「下一步」")
+                            Text("5. 添加操作：搜索 Cashback Counter，选择「解析信用卡短信」")
+                            Text("6. 点击操作卡片中的「短信全文」变量，选择上方的「快捷指令输入」>「信息」")
+                            Text("7. 点击「完成」保存自动化")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
         }
-        .navigationTitle("操作按钮截屏记账")
+        .background(Color(UIColor.systemGroupedBackground))
+        .navigationTitle("自动化与快捷指令教程")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

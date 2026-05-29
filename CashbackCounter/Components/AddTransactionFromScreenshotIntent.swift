@@ -155,7 +155,13 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
             }
         }
 
-        // 8. 创建并保存交易（附带截图作为收据）
+        // 8. 请求用户确认
+        let currencySymbol = region.currencySymbol
+        let cardName = selectedCard != nil ? "\(selectedCard!.bankName)尾号\(selectedCard!.endNum)" : "默认分类"
+        let confirmDialog = IntentDialog("识别出：\(merchant) \(currencySymbol)\(String(format: "%.2f", amount))\n将记入 \(cardName)，是否确认？")
+        try await requestConfirmation(result: .result(dialog: confirmDialog))
+
+        // 9. 创建并保存交易（附带截图作为收据）
         let receiptData = image.jpegData(compressionQuality: 0.5)
         let newTransaction = Transaction(
             merchant: merchant,
@@ -172,8 +178,7 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
         modelContext.insert(newTransaction)
         try modelContext.save()
 
-        // 9. 返回结果
-        let currencySymbol = region.currencySymbol
+        // 10. 返回结果
         return .result(dialog: "✅ 已添加：\(merchant) – \(currencySymbol)\(String(format: "%.2f", amount))")
     }
 
