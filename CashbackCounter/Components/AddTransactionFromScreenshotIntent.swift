@@ -1,25 +1,31 @@
+//
+//  AddTransactionFromScreenshotIntent.swift
+//  CashbackCounter
+//
+//  通过快捷指令传入截屏图片，OCR 识别后自动创建交易
+//
+
 import AppIntents
 import SwiftUI
 import UIKit
 import SwiftData
 import UniformTypeIdentifiers
-import Foundation
 
-/// 通过短信文本添加交易的意图
-struct AddTransactionFromSMSIntent: AppIntent {
-    // 提供意图名称和描述，便于快捷指令显示
-    static var title: LocalizedStringResource = "从信用卡通知短信添加交易"
-    static var description = IntentDescription("解析短信内容并新增一笔消费记录")
+/// 通过屏幕截图添加交易的意图（配合操作按钮 + 快捷指令使用）
+struct AddTransactionFromScreenshotIntent: AppIntent {
+    static var title: LocalizedStringResource = "从屏幕截图添加交易"
+    static var description = IntentDescription("截取屏幕内容，OCR 识别后自动记账")
 
-    // 参数：用户在快捷指令里输入或粘贴的短信文本
+    // 参数：快捷指令传入的截图文件
     @Parameter(
-      title: "短信全文",
-      requestValueDialog: IntentDialog("请粘贴信用卡短信内容")  // 提示用户输入内容
+        title: "屏幕截图",
+        description: "快捷指令截取的屏幕截图",
+        supportedContentTypes: [.image]
     )
-    var smsText: String
-    
+    var screenshot: IntentFile
+
     static var parameterSummary: some ParameterSummary {
-        Summary("解析短信文本 \(\.$smsText)")
+        Summary("识别截图 \(\.$screenshot) 并记账")
     }
 
     private static let sharedModelContainer: ModelContainer = {
@@ -32,27 +38,47 @@ struct AddTransactionFromSMSIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        
         let modelContext = ModelContext(Self.sharedModelContainer)
-        
-        
-        let textToParse = smsText.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !textToParse.isEmpty else {
-                    throw NSError(domain: "AddTransactionFromSMSIntent", code: 0, userInfo: [NSLocalizedDescriptionKey: "请提供短信文本"])
-                }
-        // 在主线程上创建解析器并调用 parse()
-        let parser = ReceiptParser()
-        let metadata = try await parser.SMSparse(text: textToParse)
 
-        // 核心字段检查
-        guard let merchant = metadata.merchant,
-              let amount = metadata.totalAmount,
-              let detectedRegion = metadata.currency,
-              let category = metadata.category else {
-            throw NSError(domain: "AddTransactionFromSMSIntent", code: 1, userInfo: [NSLocalizedDescriptionKey: "缺少商户、金额或类别信息"])
+        // 1. IntentFile → UIImage
+        let imageData = screenshot.data
+        guard let image = UIImage(data: imageData) else {
+            throw NSError(
+                domain: "AddTransactionFromScreenshotIntent",
+                code: 0,
+                userInfo: [NSLocalizedDescriptionKey: "无法读取截图数据"]
+            )
         }
 
-        // 将日期字符串转换为 Date，不存在则默认今天
+        // 2. OCR 文字提取（Vision）
+        let broadLanguages = ["zh-Hans", "en-US", "ja-JP", "zh-Hant"]
+        let rawText = await OCRService.recognizeTextInRows(from: image, languages: broadLanguages)
+
+        guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(
+                domain: "AddTransactionFromScreenshotIntent",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "截图中未识别到文字内容"]
+            )
+        }
+
+        // 3. AI 解析（独立 ReceiptParser，使用 try await 暴露错误）
+        let parser = ReceiptParser()
+        let metadata = try await parser.parse(text: rawText)
+
+        // 4. 核心字段检查
+        guard let merchant = metadata.merchant,
+              let amount = metadata.totalAmount else {
+            throw NSError(
+                domain: "AddTransactionFromScreenshotIntent",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "未能从截图中识别出商户名或金额"]
+            )
+        }
+
+        let category = metadata.category ?? .other
+
+        // 使用 OCR 解析出的日期，解析失败则回退到当前日期
         let date: Date = {
             guard let dateStr = metadata.dateString else { return Date() }
             let formatter = DateFormatter()
@@ -61,7 +87,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
             return formatter.date(from: dateStr) ?? Date()
         }()
 
-        // 根据 currency 推断 Region
+        // 5. 根据 currency 推断 Region
         let region: Region
         switch metadata.currency {
         case let code where code?.contains("CNY") == true: region = .cn
@@ -71,12 +97,12 @@ struct AddTransactionFromSMSIntent: AppIntent {
         case let code where code?.contains("NZD") == true: region = .nz
         case let code where code?.contains("TWD") == true: region = .tw
         case let code where code?.contains("GBP") == true: region = .uk
-        default:                                          region = .other
+        case let code where code?.contains("MOP") == true: region = .mo
+        default:                                            region = .cn
         }
 
+        // 6. 尝试匹配信用卡
         let availableCards = try modelContext.fetch(FetchDescriptor<CreditCard>())
-        @AppStorage("defaultCardID") var defaultCardID: String = ""
-        
         let selectedCard: CreditCard? = {
             if let last4 = metadata.cardLast4 {
                 if let matched = availableCards.first(where: { $0.endNum == last4 }) {
@@ -85,6 +111,7 @@ struct AddTransactionFromSMSIntent: AppIntent {
             }
             
             // 尝试使用默认卡片
+            let defaultCardID = UserDefaults.standard.string(forKey: "defaultCardID") ?? ""
             if !defaultCardID.isEmpty {
                 let parts = defaultCardID.split(separator: "|")
                 if parts.count == 2 {
@@ -96,13 +123,17 @@ struct AddTransactionFromSMSIntent: AppIntent {
             return nil
         }()
 
-        // 计算入账金额和返现
-        let billingAmount = amount    // 如需跨币种，可根据汇率再计算
+        // 7. 计算入账金额和返现
+        let billingAmount = amount
         var cashback: Double = 0.0
         var pointsEarned: Int = 0
+
         if let card = selectedCard {
             if card.rewardType == .points {
-                let pointValue = await resolvePointValueInCardCurrency(pointProgram: card.pointProgram, cardCurrency: card.issueRegion.currencyCode)
+                let pointValue = await resolvePointValueInCardCurrency(
+                    pointProgram: card.pointProgram,
+                    cardCurrency: card.issueRegion.currencyCode
+                )
                 let result = card.calculateCappedPoints(
                     amount: billingAmount,
                     category: category,
@@ -124,7 +155,8 @@ struct AddTransactionFromSMSIntent: AppIntent {
             }
         }
 
-        // 创建并保存交易
+        // 8. 创建并保存交易（附带截图作为收据）
+        let receiptData = image.jpegData(compressionQuality: 0.5)
         let newTransaction = Transaction(
             merchant: merchant,
             category: category,
@@ -132,15 +164,17 @@ struct AddTransactionFromSMSIntent: AppIntent {
             amount: amount,
             date: date,
             card: selectedCard,
-            receiptData: nil,
+            receiptData: receiptData,
             billingAmount: billingAmount,
             cashbackAmount: cashback,
             pointsEarned: pointsEarned
         )
         modelContext.insert(newTransaction)
         try modelContext.save()
-        // 返回意图执行结果，系统会在快捷指令中显示“完成”
-        return .result(dialog: "已成功添加账单：\(merchant) – ¥\(amount)")
+
+        // 9. 返回结果
+        let currencySymbol = region.currencySymbol
+        return .result(dialog: "✅ 已添加：\(merchant) – \(currencySymbol)\(String(format: "%.2f", amount))")
     }
 
     private func resolvePointValueInCardCurrency(pointProgram: Point?, cardCurrency: String) async -> Double {

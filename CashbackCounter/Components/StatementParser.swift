@@ -65,75 +65,56 @@ struct ImportedTransaction: Identifiable, Hashable {
 }
 
 struct StatementParser {
+    @available(macOS 26.0, iOS 26.0, *)
     func parse(from url: URL) async -> StatementMetadata? {
         guard let images = await renderPages(from: url) else { return nil }
-        let rows = await analyzeRows(from: images)
-        let fullText = fullText(from: rows)
-        let lines = fullText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        
+        var allRowsText = ""
+        var fullDocumentText = ""
+        let analyzer = StatementAnalyzer()
+        
+        for image in images {
+            let rows = await analyzer.analyze(image: image)
+            
+            for row in rows {
+                // Convert Y-clustered elements into a markdown-like table row
+                let rowText = "| " + row.elements.map(\.text).joined(separator: " | ") + " |"
+                allRowsText += rowText + "\n"
+                
+                // Keep standard space-separated text for balance/date heuristics
+                fullDocumentText += row.text + "\n"
+            }
+            allRowsText += "\n"
+        }
 
-        print("fulltest:",fullText)
-        let totalBalance = extractTotalBalance(from: fullText)
-        let statementDate = extractStatementDate(from: fullText)
-        let transactions = await parseTransactions(from: rows, fallbackLines: lines, statementDate: statementDate)
+        print("fulltest:\n", fullDocumentText)
+        let totalBalance = extractTotalBalance(from: fullDocumentText)
+        let statementDate = extractStatementDate(from: fullDocumentText)
+        
+        // Pass the highly structured markdown table to the bulk LLM parser
+        let transactions = await parseTransactions(fromTables: allRowsText, statementDate: statementDate)
 
         return StatementMetadata(
             totalBalance: totalBalance,
             transactions: transactions,
-            statementText: fullText
+            statementText: fullDocumentText
         )
     }
 
-    private func analyzeRows(from images: [UIImage]) async -> [RecognizedRow] {
-        var allRows: [RecognizedRow] = []
-        let analyzer = StatementAnalyzer()
-        for image in images {
-            let rows = await analyzer.analyze(image: image)
-            allRows.append(contentsOf: rows)
-        }
-        return allRows
-    }
-
-    private func fullText(from rows: [RecognizedRow]) -> String {
-        rows.map(\.text).joined(separator: "\n")
-    }
-
     private func parseTransactions(
-        from rows: [RecognizedRow],
-        fallbackLines: [String],
+        fromTables tablesText: String,
         statementDate: Date?
     ) async -> [ImportedTransaction] {
-        let modelResults = await parseTransactionsWithFoundationModel(from: rows, statementDate: statementDate)
-        if !modelResults.isEmpty {
-            return modelResults
-        }
-        return parseTransactions(from: fallbackLines, statementDate: statementDate)
-    }
-
-    private func parseTransactionsWithFoundationModel(
-        from rows: [RecognizedRow],
-        statementDate: Date?
-    ) async -> [ImportedTransaction] {
-        guard !rows.isEmpty else { return [] }
-        let blocks = groupRowsIntoTransactionBlocks(rows, statementDate: statementDate)
-        guard !blocks.isEmpty else { return [] }
-        let blockTexts = blocks.map { block in
-            block.map(\.text).joined(separator: "\n")
-        }
-
+        guard !tablesText.isEmpty else { return [] }
+        
         var parsed: [StatementRowTransaction] = []
         let parser = ReceiptParser()
 
-        for block in blockTexts {
-            do {
-                var item = try await parser.parseStatementTransactionBlock(text: block)
-                item.rawText = block
-                parsed.append(item)
-            } catch {
-                print("Statement block parse failed: \(error)")
-            }
+        do {
+            let list = try await parser.parseStatementTransactionsBatch(text: tablesText)
+            parsed = list.transactions
+        } catch {
+            print("Statement batch parse failed: \(error)")
         }
 
         if parsed.isEmpty {

@@ -40,6 +40,39 @@ struct CameraRecordView: View {
                         }
                     )
             }
+            // --- 层级 2.5: 相机权限被拒绝提示 ---
+            if cameraService.permissionDenied {
+                Color.black.opacity(0.85)
+                    .ignoresSafeArea()
+                    .overlay(
+                        VStack(spacing: 16) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 48))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text("无法访问相机")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Text("请在系统设置中开启相机权限")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                            Button(action: {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }) {
+                                Text("前往设置")
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white)
+                                    .foregroundColor(.black)
+                                    .clipShape(Capsule())
+                            }
+                            .padding(.top, 8)
+                        }
+                    )
+            }
             // --- 层级 3: 操作按钮 ---
             VStack {
                 Spacer() // 把按钮推到底部
@@ -117,20 +150,19 @@ struct CameraRecordView: View {
         .onDisappear {
             cameraService.stopSession() // 页面消失时，关闭相机
         }
-        // 监听：如果相机拍到了照片，就跳转
+        // 监听：如果相机拍到了照片，赋值给 selectedImage（统一由下面的 onChange 处理跳转）
         .onChange(of: cameraService.recentImage) { oldValue, newImage in
             if let img = newImage {
                 self.selectedImage = img
-                self.showAddSheet = true
             }
         }
         // 弹窗 1：相册
         .sheet(isPresented: $showPhotoLibrary) {
             ImagePicker(selectedImage: $selectedImage, sourceType: .photoLibrary)
         }
-        // 监听：如果从相册选了图，也跳转
+        // 监听：统一跳转入口（无论拍照/相册/拖拽，都经这里）
         .onChange(of: selectedImage) { oldValue, newImage in
-            if newImage != nil {
+            if newImage != nil && !showAddSheet {
                 showAddSheet = true
             }
         }

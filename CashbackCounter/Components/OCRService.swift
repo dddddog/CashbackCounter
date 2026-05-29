@@ -128,7 +128,12 @@ struct OCRService {
                 }
                 request.recognitionLevel = .accurate
                 request.recognitionLanguages = languages
-                try? requestHandler.perform([request])
+                do {
+                    try requestHandler.perform([request])
+                } catch {
+                    print("Vision OCR 错误: \(error)")
+                    continuation.resume(returning: "")
+                }
             }
         }
     }
@@ -149,7 +154,12 @@ struct OCRService {
                 }
                 request.recognitionLevel = .accurate
                 request.recognitionLanguages = languages
-                try? requestHandler.perform([request])
+                do {
+                    try requestHandler.perform([request])
+                } catch {
+                    print("Vision OCR 错误: \(error)")
+                    continuation.resume(returning: [])
+                }
             }
         }
     }
@@ -258,5 +268,31 @@ struct OCRService {
         }
 
         return output
+    }
+    
+    // MARK: - 🌟 iOS 18 / macOS 15 Native Table Extraction
+    @available(macOS 26.0, iOS 26.0, *)
+    static func extractDocumentLayout(from image: UIImage) async throws -> (tables: String, text: String) {
+        guard let cgImage = image.cgImage else { return ("", "") }
+        
+        let request = RecognizeDocumentsRequest()
+        let results = try await request.perform(on: cgImage)
+        
+        var tablesString = ""
+        var fullText = ""
+        
+        for obs in results {
+            fullText += obs.document.text.transcript + "\n"
+            
+            for table in obs.document.tables {
+                for row in table.rows {
+                    let rowTexts = row.map { $0.content.text.transcript.replacingOccurrences(of: "\n", with: " ") }
+                    tablesString += "| " + rowTexts.joined(separator: " | ") + " |\n"
+                }
+                tablesString += "\n"
+            }
+        }
+        
+        return (tablesString, fullText)
     }
 }

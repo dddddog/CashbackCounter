@@ -110,6 +110,19 @@ final class ReceiptParser {
         "Using the foreignCurrency to confirm foreign amount and billing amount"
         "Do not guess. If unsure, return nil for the field."
     }
+
+    private let statementTransactionsBulkInstructions = Instructions{
+        "You are an expert credit card statement transaction extractor."
+        "You will receive a Markdown table (or multiple tables) representing a credit card statement."
+        "Extract all valid financial transactions from the tables into a list."
+        "Only return merchant with alphabet characters or necessary numbers."
+        "Ignore rows that are headers, balances, payments, totals, interest, or fees."
+        "For each transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
+        "Dates must be in YYYY-MM-DD. If only one date is present, use it for transactionDate."
+        "billingAmount is the settled amount in statement currency."
+        "Using the foreignCurrency to confirm foreign amount and billing amount."
+        "Do not guess. If unsure, return nil for the field."
+    }
     
     init() {}
 
@@ -194,6 +207,18 @@ final class ReceiptParser {
             generating: StatementRowTransaction.self
         ) {
             "Analyze this statement block:"
+            text
+        }
+
+        return response.content
+    }
+
+    func parseStatementTransactionsBatch(text: String) async throws -> StatementRowTransactionList {
+        let session = LanguageModelSession(instructions: statementTransactionsBulkInstructions)
+        let response = try await session.respond(
+            generating: StatementRowTransactionList.self
+        ) {
+            "Analyze these statement tables:"
             text
         }
 

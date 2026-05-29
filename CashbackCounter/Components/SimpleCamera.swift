@@ -16,6 +16,7 @@ class CameraService: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()
     @Published var output = AVCapturePhotoOutput()
     @Published var recentImage: UIImage? // 存刚才拍的照片
+    @Published var permissionDenied = false // Bug 3: 权限被拒绝时通知 UI
     private var isConfigured = false
     
     // 检查权限并启动
@@ -23,11 +24,21 @@ class CameraService: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { status in
-                if status { self.setup() }
+                DispatchQueue.main.async {
+                    if status {
+                        self.setup()
+                    } else {
+                        self.permissionDenied = true
+                    }
+                }
             }
         case .authorized:
             setup()
-        default:
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                self.permissionDenied = true
+            }
+        @unknown default:
             return
         }
     }
@@ -86,7 +97,10 @@ class CameraService: NSObject, ObservableObject {
 extension CameraService: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard let data = photo.fileDataRepresentation() else { return }
-        self.recentImage = UIImage(data: data)
+        // Bug 2 修复：回调在后台线程，必须切主线程更新 @Published 属性
+        DispatchQueue.main.async {
+            self.recentImage = UIImage(data: data)
+        }
     }
 }
 

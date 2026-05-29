@@ -25,6 +25,7 @@ struct SettingsView: View {
     @AppStorage("userLanguage") private var userLanguage: String = "system"
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
     @AppStorage("iCloudSyncEnabled") private var iCloudSyncEnabled: Bool = true
+    @AppStorage("defaultCardID") private var defaultCardID: String = ""
     @State private var showSyncChangeAlert = false
     
     @Environment(\.modelContext) var context
@@ -110,8 +111,37 @@ struct SettingsView: View {
                         Text("新台币（TWD）").tag("TWD")
                     }
                     
+                    Picker(selection: $defaultCardID, label: Label("默认记账卡片", systemImage: "creditcard.circle")) {
+                        Text("无默认卡片").tag("")
+                        ForEach(cards) { card in
+                            Text("\(card.bankName) (\(card.endNum))").tag("\(card.bankName)|\(card.endNum)")
+                        }
+                    }
+                    
                     NavigationLink(destination: NotificationSettingsView()) {
                         Label("通知提醒", systemImage: "bell")
+                    }
+                }
+                
+                // Shortcuts Section
+                Section(header: Text("自动化与快捷指令")) {
+                    Link(destination: URL(string: "https://www.icloud.com/shortcuts/aceb7bb680d74a99aaee23f2c9005089")!) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("获取截屏记账快捷指令")
+                                    .foregroundColor(.primary)
+                                Text("配合操作按钮，一键截屏并自动入账")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "camera.viewfinder")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    NavigationLink(destination: ShortcutGuideView()) {
+                        Label("操作按钮配置教程", systemImage: "book.pages")
                     }
                 }
                 
@@ -280,4 +310,64 @@ struct ActivityViewController: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct ShortcutGuideView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("通过搭配 iPhone 的操作按钮 (Action Button)，你可以实现一键截屏并自动调用 Cashback Counter 进行智能记账。")
+                    .foregroundColor(.secondary)
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("第一步：获取快捷指令")
+                        .font(.headline)
+                    Text("点击下方按钮，将预设的快捷指令添加到你的系统中。")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                    
+                    Link(destination: URL(string: "https://www.icloud.com/shortcuts/aceb7bb680d74a99aaee23f2c9005089")!) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("下载快捷指令")
+                        }
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .padding(.top, 4)
+                }
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("第二步：配置操作按钮")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("1. 打开 iPhone 的「设置」应用", systemImage: "gear")
+                        Label("2. 找到「操作按钮」选项", systemImage: "button.programmable")
+                        Label("3. 左右滑动，选择「快捷指令」功能", systemImage: "hand.draw")
+                        Label("4. 点击选择刚才下载的「截屏智能记账」", systemImage: "checkmark.circle")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                }
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("第三步：如何使用")
+                        .font(.headline)
+                    
+                    Text("在任何有消费凭证或账单的页面（如支付宝、微信支付完成页），长按 iPhone 侧边的操作按钮，系统会自动截取当前屏幕，并唤起 App 进行 OCR 识别和记账。")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle("操作按钮截屏记账")
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }

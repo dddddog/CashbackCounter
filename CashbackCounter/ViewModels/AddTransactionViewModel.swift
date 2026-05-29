@@ -106,9 +106,22 @@ final class AddTransactionViewModel {
 
     func applyPrefillCardSelection(cards: [CreditCard]) {
         guard transactionToEdit == nil else { return }
-        guard let prefillCardLast4 else { return }
-        guard let index = cards.firstIndex(where: { $0.endNum == prefillCardLast4 }) else { return }
-        selectedCardIndex = index
+        if let prefillCardLast4, let index = cards.firstIndex(where: { $0.endNum == prefillCardLast4 }) {
+            selectedCardIndex = index
+            return
+        }
+        
+        let defaultCardID = UserDefaults.standard.string(forKey: "defaultCardID") ?? ""
+        if !defaultCardID.isEmpty {
+            let parts = defaultCardID.split(separator: "|")
+            if parts.count == 2 {
+                let bank = String(parts[0])
+                let end = String(parts[1])
+                if let index = cards.firstIndex(where: { $0.bankName == bank && $0.endNum == end }) {
+                    selectedCardIndex = index
+                }
+            }
+        }
     }
 
     // MARK: - AI Analysis
@@ -128,6 +141,18 @@ final class AddTransactionViewModel {
                     if let dateStr = data.dateString { self.date = dateStr.toDate() }
                     if let last4 = data.cardLast4, let index = cards.firstIndex(where: { $0.endNum == last4 }) {
                         self.selectedCardIndex = index
+                    } else {
+                        let defaultCardID = UserDefaults.standard.string(forKey: "defaultCardID") ?? ""
+                        if !defaultCardID.isEmpty {
+                            let parts = defaultCardID.split(separator: "|")
+                            if parts.count == 2 {
+                                let bank = String(parts[0])
+                                let end = String(parts[1])
+                                if let index = cards.firstIndex(where: { $0.bankName == bank && $0.endNum == end }) {
+                                    self.selectedCardIndex = index
+                                }
+                            }
+                        }
                     }
                     if let cat = data.category { self.selectedCategory = cat }
                     if let currency = data.currency {
