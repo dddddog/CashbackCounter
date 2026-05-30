@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 struct ReconciliationReport {
     let matched: [ImportedTransaction]
@@ -9,11 +10,17 @@ struct ReconciliationEngine {
     func compare(imported: [ImportedTransaction], existing: [Transaction]) -> ReconciliationReport {
         let calendar = Calendar.current
 
+        var usedExistingIDs: Set<Transaction.ID> = []
+
         let matched = imported.filter { importedTransaction in
             existing.contains { transaction in
-                amountsMatch(importedTransaction.billingAmount, transaction.billingAmount) &&
-                datesWithinRange(importedTransaction.transactionDate, transaction.date, calendar: calendar) &&
-                merchantsMatch(importedTransaction.merchant, transaction.merchant)
+                guard !usedExistingIDs.contains(transaction.id) else { return false }
+                let isMatch = amountsMatch(importedTransaction, transaction) &&
+                    datesWithinRange(importedTransaction.transactionDate, transaction.date, calendar: calendar)
+                if isMatch {
+                    usedExistingIDs.insert(transaction.id)
+                }
+                return isMatch
             }
         }
 
@@ -24,8 +31,11 @@ struct ReconciliationEngine {
         return ReconciliationReport(matched: matched, missingInApp: missing)
     }
 
-    private func amountsMatch(_ lhs: Double, _ rhs: Double) -> Bool {
-        return abs(lhs - rhs) < 0.0001
+    private func amountsMatch(_ imported: ImportedTransaction, _ existing: Transaction) -> Bool {
+        let importedAmount = imported.billingAmount
+        if abs(importedAmount - existing.billingAmount) < 0.01 { return true }
+        if abs(importedAmount - existing.amount) < 0.01 { return true }
+        return false
     }
 
     private func datesWithinRange(_ lhs: Date, _ rhs: Date, calendar: Calendar) -> Bool {
@@ -34,12 +44,6 @@ struct ReconciliationEngine {
         let dayDiff = calendar.dateComponents([.day], from: leftDay, to: rightDay).day ?? Int.max
         return abs(dayDiff) <= 3
     }
-
-    private func merchantsMatch(_ lhs: String, _ rhs: String) -> Bool {
-        let normalizedLhs = lhs.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedRhs = rhs.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalizedLhs.isEmpty, !normalizedRhs.isEmpty else { return false }
-        return normalizedLhs.contains(normalizedRhs) || normalizedRhs.contains(normalizedLhs)
-    }
 }
+
 

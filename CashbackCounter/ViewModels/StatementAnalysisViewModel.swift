@@ -25,8 +25,15 @@ final class StatementAnalysisViewModel {
         analyzedTransactions.isEmpty ? statement.transactions : analyzedTransactions
     }
 
-    func report(statement: StatementMetadata, transactions: [Transaction]) -> ReconciliationReport {
-        ReconciliationEngine().compare(imported: displayedTransactions(statement: statement), existing: transactions)
+    func report(statement: StatementMetadata, transactions: [Transaction], cards: [CreditCard]) -> ReconciliationReport {
+        let card = selectedCard(cards: cards)
+        let filtered: [Transaction]
+        if let card {
+            filtered = transactions.filter { $0.card?.id == card.id }
+        } else {
+            filtered = transactions
+        }
+        return ReconciliationEngine().compare(imported: displayedTransactions(statement: statement), existing: filtered)
     }
 
     func selectedCard(cards: [CreditCard]) -> CreditCard? {

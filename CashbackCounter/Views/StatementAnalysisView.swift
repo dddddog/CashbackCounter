@@ -126,7 +126,7 @@ struct StatementAnalysisView: View {
     @State private var viewModel = StatementAnalysisViewModel()
 
     private var report: ReconciliationReport {
-        viewModel.report(statement: statement, transactions: transactions)
+        viewModel.report(statement: statement, transactions: transactions, cards: cards)
     }
 
     var body: some View {
