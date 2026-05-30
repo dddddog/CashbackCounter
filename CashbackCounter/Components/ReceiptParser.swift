@@ -75,7 +75,9 @@ final class ReceiptParser {
 
     private let statementCardInstructions = Instructions{
         "You are an expert credit card statement parser."
-        "Extract the card product name and the last 4 digits of the card."
+        "Extract the card product name and the trailing digits of the card number."
+        "Return ALL trailing digits exactly as shown after the mask (e.g. if '****71006', return '71006' not '7100')."
+        "Do not truncate or pad the digits."
         "If a field is missing, return nil for it."
         "Do not guess. Use only information present in the statement text."
     }
@@ -86,16 +88,19 @@ final class ReceiptParser {
         "Use merchant name, currency code/symbols, and context words to infer region."
         "CRITICAL RULES FOR CATEGORIZATION:"
         "- Analyze the merchant name and items purchased."
-        "- 'dining': Restaurants, Cafes, Starbucks, Izakaya (居酒屋), Ramen (ラーメン)." // 👈 新增：居酒屋/拉面
-        "- 'grocery': Supermarkets, 7-Eleven, Lawson, FamilyMart, Daily necessities." // 👈 新增：日本常见便利店
-        "- 'travel': Uber, Taxi, Flights, Hotels, Suica, Pasmo, Shinkansen (新幹線)." // 👈 新增：西瓜卡/新干线
-        "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera." // 👈 新增：友都八喜/Bic Camera
+        "- 'dining': Restaurants, Cafes, Starbucks, Izakaya (居酒屋), Ramen (ラーメン)."
+        "- 'grocery': Supermarkets, 7-Eleven, Lawson, FamilyMart, Daily necessities."
+        "- 'travel': Uber, Taxi, Flights, Hotels, Suica, Pasmo, Shinkansen (新幹線)."
+        "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera."
         "- 'other': Anything that doesn't fit above."
         "Use payment hints such as Apple Pay, online, QR, tap, NFC, or card present/online words."
-        "Extract the original transaction amount in foreign currency if the statement shows exchange details."
-        "Original transaction amount in foreign currency. If there's a X between 2 numbers(like 775.00 X 0.00642580), the first number(775) is the foreignAmount. NOT SAME AS BILLING AMOUNT, Return nil if not present."
-        "Do not return the billing/settlement amount as foreignAmount."
-        "If unsure, return nil for the field."
+        "CRITICAL RULES FOR foreignAmount:"
+        "- foreignAmount is ONLY for currency conversion. It means the original amount in the foreign currency BEFORE conversion."
+        "- A conversion looks like: '775.00 X 0.00642580' or 'USD 100.00 → HKD 780.00'. The foreign side is foreignAmount."
+        "- If BillingCurrency matches the transaction currency, there is NO foreign amount. Return nil."
+        "- If there is only one amount shown and no conversion/exchange details, return nil."
+        "- NEVER copy the billing amount into foreignAmount. If unsure, return nil."
+        "If unsure about any field, return nil."
     }
 
     private let statementRowInstructions = Instructions{
@@ -112,21 +117,18 @@ final class ReceiptParser {
     }
 
     private let statementTransactionsBulkInstructions = Instructions{
-        "You are an expert credit card statement transaction extractor."
-        "You will receive a Markdown table (or multiple tables) representing a credit card statement."
-        "Extract all valid financial transactions from the tables into a list."
-        "Only return merchant with alphabet characters or necessary numbers."
-        "Ignore rows that are headers, balances, payments, totals, interest, or fees."
-        "For each transaction return: transactionDate, merchant, billingAmount, foreignAmount, foreignCurrency."
-        "Dates must be in YYYY-MM-DD. If only one date is present, use it for transactionDate."
-        "billingAmount is the settled amount in statement currency."
-        "Using the foreignCurrency to confirm foreign amount and billing amount."
-        "Do not guess. If unsure, return nil for the field."
+        "Extract transactions from the markdown table."
+        "Skip headers, balances, payments, totals, interest, fees."
+        "Dates: YYYY-MM-DD. billingAmount = settled amount."
+        "foreignAmount: only if currency conversion shown, else nil."
+        "If unsure, return nil."
     }
     
     init() {}
 
-    private func normalizedCardLast4(_ value: String?) -> String? {
+    /// Extract the last 4 digits from a card number string.
+    /// Exposed as internal static for testability.
+    nonisolated static func normalizedCardLast4(_ value: String?) -> String? {
         let digits = value?.filter { $0.isNumber } ?? ""
         guard digits.count >= 4 else { return nil }
         return String(digits.suffix(4))
@@ -180,7 +182,7 @@ final class ReceiptParser {
         }
 
         var metadata = response.content
-        metadata.cardLast4 = normalizedCardLast4(metadata.cardLast4)
+        metadata.cardLast4 = Self.normalizedCardLast4(metadata.cardLast4)
         print("Statement OCR fields: cardLast4=\(metadata.cardLast4 ?? "nil"), cardName=\(metadata.cardName ?? "nil")")
         return metadata
     }

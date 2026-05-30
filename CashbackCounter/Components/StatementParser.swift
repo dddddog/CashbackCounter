@@ -91,8 +91,12 @@ struct StatementParser {
         let totalBalance = extractTotalBalance(from: fullDocumentText)
         let statementDate = extractStatementDate(from: fullDocumentText)
         
-        // Pass the highly structured markdown table to the bulk LLM parser
-        let transactions = await parseTransactions(fromTables: allRowsText, statementDate: statementDate)
+        // Filter to only transaction-relevant rows before sending to model
+        let filteredRowsText = extractTransactionRows(from: allRowsText)
+        StatementDebugLogger.log("Filtered rows: \(filteredRowsText.count) chars (was \(allRowsText.count))")
+
+        // Pass the filtered markdown table to the bulk LLM parser
+        let transactions = await parseTransactions(fromTables: filteredRowsText, statementDate: statementDate)
 
         return StatementMetadata(
             totalBalance: totalBalance,
@@ -101,20 +105,133 @@ struct StatementParser {
         )
     }
 
+    // MARK: - Transaction Section Extraction
+
+    /// Keywords that mark the START of a transaction section.
+    private static let transactionStartKeywords: [String] = [
+        // English
+        "transaction", "transactions", "transaction details",
+        "new transactions", "new charges", "purchases",
+        "card transactions", "retail transactions",
+        "payment and credits", "payments and other credits",
+        // Chinese (Traditional / Simplified)
+        "交易明細", "交易明细", "交易記錄", "交易记录",
+        "簽賬項目", "签账项目", "消費明細", "消费明细",
+        // Japanese
+        "ご利用明細", "ご利用代金明細", "お取引明細"
+    ]
+
+    /// Keywords that mark the END of a transaction section (start of non-transaction content).
+    private static let transactionEndKeywords: [String] = [
+        // English
+        "interest charge", "finance charge", "fees",
+        "account summary", "statement summary", "summary of account",
+        "important notice", "important information",
+        "terms and conditions", "contact us", "customer service",
+        "reward", "points summary", "cashback summary",
+        "minimum payment", "payment due", "total amount due",
+        "credit limit", "available credit",
+        // Chinese
+        "利息", "費用", "费用", "積分", "积分",
+        "繳款", "缴款", "還款", "还款摘要",
+        "重要通知", "條款", "条款",
+        // Japanese
+        "利息", "手数料", "お支払い", "ご返済"
+    ]
+
+    /// Extract only the rows that belong to transaction sections.
+    /// Uses section header detection to find transaction blocks and skip
+    /// irrelevant content (summaries, legal notices, interest, fees, etc.).
+    func extractTransactionRows(from allRowsText: String) -> String {
+        let lines = allRowsText.components(separatedBy: "\n")
+        var filteredLines: [String] = []
+        var inTransactionSection = false
+
+        for line in lines {
+            let stripped = line
+                .replacingOccurrences(of: "|", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = stripped.lowercased()
+
+            // Check for section boundaries
+            if Self.transactionStartKeywords.contains(where: { lower.contains($0) }),
+               !looksLikeDataRow(stripped) {
+                inTransactionSection = true
+                continue // skip the header row itself
+            }
+
+            if inTransactionSection,
+               Self.transactionEndKeywords.contains(where: { lower.contains($0) }),
+               !looksLikeDataRow(stripped) {
+                inTransactionSection = false
+                continue
+            }
+
+            if inTransactionSection {
+                // Skip noise rows even within a transaction section
+                if !isLikelyNoise(stripped) {
+                    filteredLines.append(line)
+                }
+            }
+        }
+
+        // Fallback: if no section headers were detected, return original text
+        // (some statements don't have clear section headers)
+        if filteredLines.isEmpty {
+            return allRowsText
+        }
+
+        return filteredLines.joined(separator: "\n")
+    }
+
+    /// A data row typically contains a dollar amount — this distinguishes
+    /// actual transaction rows from section headers that happen to contain keywords.
+    func looksLikeDataRow(_ text: String) -> Bool {
+        let amountRegex = try? NSRegularExpression(pattern: "\\d+[,.]\\d{2}")
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return (amountRegex?.firstMatch(in: text, range: range)) != nil
+    }
+
+    /// Filter out individual rows that are clearly not transaction data.
+    func isLikelyNoise(_ stripped: String) -> Bool {
+        // Empty or very short rows
+        if stripped.count < 3 { return true }
+
+        let lower = stripped.lowercased()
+
+        // Page markers / footers
+        if lower.hasPrefix("page ") && stripped.count < 20 { return true }
+        if lower.contains("continued on") || lower.contains("continued from") { return true }
+
+        // Column headers that repeat on every page
+        let headerPatterns = [
+            "posting date", "transaction date", "description", "amount",
+            "date posted", "date of transaction", "reference number",
+            "記帳日", "交易日", "摘要", "金額", "卡號"
+        ]
+        let matchCount = headerPatterns.filter { lower.contains($0) }.count
+        if matchCount >= 2 { return true }
+
+        return false
+    }
+
     private func parseTransactions(
         fromTables tablesText: String,
         statementDate: Date?
     ) async -> [ImportedTransaction] {
         guard !tablesText.isEmpty else { return [] }
-        
+
+        let chunks = splitIntoChunks(text: tablesText, maxCharacters: 1500)
         var parsed: [StatementRowTransaction] = []
         let parser = ReceiptParser()
 
-        do {
-            let list = try await parser.parseStatementTransactionsBatch(text: tablesText)
-            parsed = list.transactions
-        } catch {
-            print("Statement batch parse failed: \(error)")
+        for chunk in chunks {
+            do {
+                let list = try await parser.parseStatementTransactionsBatch(text: chunk)
+                parsed.append(contentsOf: list.transactions)
+            } catch {
+                print("Statement batch parse failed for chunk: \(error)")
+            }
         }
 
         if parsed.isEmpty {
@@ -122,6 +239,33 @@ struct StatementParser {
         }
 
         return buildImportedTransactions(from: parsed, statementDate: statementDate)
+    }
+
+    /// Split markdown table text into chunks that stay within the Foundation Models
+    /// context window (4096 tokens). Each chunk keeps complete rows to avoid
+    /// cutting a transaction in half.
+    private func splitIntoChunks(text: String, maxCharacters: Int) -> [String] {
+        let lines = text.components(separatedBy: "\n")
+        var chunks: [String] = []
+        var currentChunk: [String] = []
+        var currentLength = 0
+
+        for line in lines {
+            let lineLength = line.count + 1 // +1 for newline
+            if currentLength + lineLength > maxCharacters && !currentChunk.isEmpty {
+                chunks.append(currentChunk.joined(separator: "\n"))
+                currentChunk = []
+                currentLength = 0
+            }
+            currentChunk.append(line)
+            currentLength += lineLength
+        }
+
+        if !currentChunk.isEmpty {
+            chunks.append(currentChunk.joined(separator: "\n"))
+        }
+
+        return chunks
     }
 
     private func groupRowsIntoTransactionBlocks(
@@ -175,21 +319,17 @@ struct StatementParser {
             guard !merchant.isEmpty else { continue }
             guard let billingAmount = item.billingAmount else { continue }
 
-            let transactionDate = parseStatementDate(from: item.transactionDate, statementDate: statementDate)
-            let postDate = parseStatementDate(from: item.postDate, statementDate: statementDate)
-            guard let resolvedTransactionDate = transactionDate ?? postDate else { continue }
-            let resolvedPostDate = postDate ?? resolvedTransactionDate
+            guard let transactionDate = parseStatementDate(from: item.transactionDate, statementDate: statementDate) else { continue }
 
             let normalizedBilling = abs(billingAmount)
             let normalizedForeign = item.foreignAmount.map { abs($0) }
             let transaction = ImportedTransaction(
-                transactionDate: resolvedTransactionDate,
-                postDate: resolvedPostDate,
+                transactionDate: transactionDate,
+                postDate: transactionDate,
                 merchant: merchant,
                 billingAmount: normalizedBilling,
                 foreignAmount: normalizedForeign,
-                foreignCurrency: item.foreignCurrency,
-                rawText: item.rawText
+                foreignCurrency: item.foreignCurrency
             )
             results.append(transaction)
         }

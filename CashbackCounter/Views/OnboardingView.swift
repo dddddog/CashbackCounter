@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     let onFinish: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selection = 0
 
     private let pages: [OnboardingPage] = [
@@ -47,7 +48,9 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.93, green: 0.97, blue: 1.0), Color(red: 0.92, green: 0.95, blue: 0.94)],
+                colors: colorScheme == .dark
+                    ? [Color(red: 0.08, green: 0.10, blue: 0.14), Color(red: 0.10, green: 0.12, blue: 0.13)]
+                    : [Color(red: 0.93, green: 0.97, blue: 1.0), Color(red: 0.92, green: 0.95, blue: 0.94)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -79,8 +82,8 @@ struct OnboardingView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color.black.opacity(0.85))
-                        .foregroundColor(.white)
+                        .background(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
+                        .foregroundColor(colorScheme == .dark ? .black : .white)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .padding(.horizontal, 24)

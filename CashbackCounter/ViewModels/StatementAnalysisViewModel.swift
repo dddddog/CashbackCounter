@@ -167,10 +167,11 @@ final class StatementAnalysisViewModel {
 
     private func transactionPromptText(for transaction: ImportedTransaction, cards: [CreditCard]) -> String {
         let card = selectedCard(cards: cards)
+        let currencyCode = card?.issueRegion.currencyCode ?? "unknown"
         var lines: [String] = [
             "Merchant: \(transaction.merchant)",
-            "BillingAmount: \(String(format: "%.2f", transaction.billingAmount))",
-            "BillingCurrency: \(String(card?.issueRegion.currencyCode ?? "unknow")),"
+            "BillingAmount: \(String(format: "%.2f", transaction.billingAmount)) \(currencyCode)",
+            "BillingCurrency: \(currencyCode)"
         ]
 
         if let currency = transaction.region?.currencyCode, let amount = transaction.foreignAmount {
