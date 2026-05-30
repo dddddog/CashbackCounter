@@ -221,7 +221,7 @@ struct StatementParser {
     ) async -> [ImportedTransaction] {
         guard !tablesText.isEmpty else { return [] }
 
-        let chunks = splitIntoChunks(text: tablesText, maxCharacters: 1500)
+        let chunks = splitIntoChunks(text: tablesText, maxCharacters: 900)
         var parsed: [StatementRowTransaction] = []
         let parser = ReceiptParser()
 

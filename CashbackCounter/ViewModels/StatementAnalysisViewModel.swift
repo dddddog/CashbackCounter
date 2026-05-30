@@ -198,15 +198,16 @@ final class StatementAnalysisViewModel {
 
         let keywords = [
             "card", "card number", "card no", "ending", "account",
-            "xxxx", "****", "hsbc", "visa", "mastercard", "amex"
+            "xxxx", "****", "hsbc", "visa", "mastercard", "amex",
+            "american express", "member", "會員", "会员", "卡號", "卡号"
         ]
 
         var selectedIndexes: Set<Int> = []
         for (index, line) in lines.enumerated() {
             let lower = line.lowercased()
             let hasKeyword = keywords.contains { lower.contains($0) }
-            let hasDigits = line.contains(where: { $0.isNumber })
-            if hasKeyword || hasDigits && (lower.contains("****") || lower.contains("xxxx")) {
+            let hasMaskedDigits = lower.contains("****") || lower.contains("xxxx")
+            if hasKeyword || hasMaskedDigits {
                 selectedIndexes.insert(index)
                 if index > 0 { selectedIndexes.insert(index - 1) }
                 if index + 1 < lines.count { selectedIndexes.insert(index + 1) }
@@ -215,13 +216,13 @@ final class StatementAnalysisViewModel {
 
         var selectedLines: [String] = []
         if selectedIndexes.isEmpty {
-            selectedLines = Array(lines.prefix(80))
+            selectedLines = Array(lines.prefix(30))
         } else {
             selectedLines = selectedIndexes.sorted().map { lines[$0] }
         }
 
         var prompt = selectedLines.joined(separator: "\n")
-        let maxChars = 1800
+        let maxChars = 800
         if prompt.count > maxChars {
             prompt = String(prompt.prefix(maxChars))
         }
