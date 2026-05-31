@@ -12,6 +12,7 @@ final class AddCardViewModel {
     var bankName: String
     var cardType: String
     var endNum: String
+    var memo: String
     var color1: Color
     var color2: Color
     var region: Region
@@ -96,6 +97,7 @@ final class AddCardViewModel {
             bankName = card.bankName
             cardType = card.type
             endNum = card.endNum
+            memo = card.memo
             repaymentDayStr = card.repaymentDay > 0 ? String(card.repaymentDay) : ""
 
             if card.colors.count >= 2 {
@@ -141,6 +143,7 @@ final class AddCardViewModel {
             bankName = template.bankName
             cardType = template.type
             endNum = "8888"
+            memo = template.memo ?? ""
             cardImageData = nil
 
             if template.localBaseCap > 0 {
@@ -202,6 +205,7 @@ final class AddCardViewModel {
             bankName = ""
             cardType = ""
             endNum = ""
+            memo = ""
             color1 = .blue
             color2 = .purple
             region = .cn
@@ -284,6 +288,7 @@ final class AddCardViewModel {
             existingCard.bankName = bankName
             existingCard.type = cardType
             existingCard.endNum = endNum
+            existingCard.memo = memo
             existingCard.colorHexes = [c1Hex, c2Hex]
             existingCard.defaultRate = defaultRate
             existingCard.issueRegion = region
@@ -321,6 +326,7 @@ final class AddCardViewModel {
                 categoryCaps: catCaps,
                 capPeriod: capPeriod,
                 repaymentDay: rDay,
+                memo: memo,
                 paymentMethodRates: finalPaymentRates,
                 paymentCaps: finalPaymentCaps,
                 rewardType: rewardType,

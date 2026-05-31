@@ -83,6 +83,8 @@ extension Point {
         PointSeed(bankName: "AMEX US", pointName: "MR", pointValue: 0.016, valueCurrencyCode: .us),
         PointSeed(bankName: "Marriott", pointName: "Point", pointValue: 0.007, valueCurrencyCode: .us),
         PointSeed(bankName: "Hilton", pointName: "Point", pointValue: 0.004, valueCurrencyCode: .us),
+        PointSeed(bankName: "Alaska", pointName: "ATMOS", pointValue: 0.016, valueCurrencyCode: .us),
+
 
 
         

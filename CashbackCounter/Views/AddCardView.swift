@@ -70,6 +70,7 @@ struct AddCardView: View {
                         .onChange(of: viewModel.endNum) { oldValue, newValue in
                             if newValue.count > 4 { viewModel.endNum = String(newValue.prefix(4)) }
                         }
+                    TextField("备注 (可选)", text: $viewModel.memo)
                 }
                 
                 HStack {

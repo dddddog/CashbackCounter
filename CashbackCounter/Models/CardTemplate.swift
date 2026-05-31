@@ -32,11 +32,12 @@ struct CardTemplate: Identifiable, Codable, Hashable {
     var paymentCaps: [PaymentMethod: Double] = [:]
     var capPeriod: CapPeriod = .yearly
     var pictureURL: String? = nil
+    var memo: String? = nil
 
     var templateKey: String { Self.templateKey(bankName: bankName, type: type) }
 
     enum CodingKeys: String, CodingKey {
-        case bankName, type, colors, region, specialRate, paymentMethodRates, rewardType, pointProgramKey, defaultRate, foreignCurrencyRate, localBaseCap, foreignBaseCap, categoryCaps, paymentCaps, capPeriod, pictureURL
+        case bankName, type, colors, region, specialRate, paymentMethodRates, rewardType, pointProgramKey, defaultRate, foreignCurrencyRate, localBaseCap, foreignBaseCap, categoryCaps, paymentCaps, capPeriod, pictureURL, memo
     }
 
     static func pointTemplateKey(bankName: String, pointName: String, currencyCode: Region) -> String {
