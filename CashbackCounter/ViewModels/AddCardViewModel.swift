@@ -48,6 +48,7 @@ final class AddCardViewModel {
     var rewardType: RewardType
     var selectedPointID: UUID?
     var showPointLibrary = false
+    var showPhotoPicker = false
 
     // MARK: - Computed Helpers
 

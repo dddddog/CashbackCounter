@@ -61,17 +61,21 @@ struct AddTransactionFromSMSIntent: AppIntent {
             return formatter.date(from: dateStr) ?? Date()
         }()
 
-        // 根据 currency 推断 Region
+        // 使用本地推断获取 Region，若失败则根据 currency 推断
         let region: Region
-        switch metadata.currency {
-        case let code where code?.contains("CNY") == true: region = .cn
-        case let code where code?.contains("USD") == true: region = .us
-        case let code where code?.contains("HKD") == true: region = .hk
-        case let code where code?.contains("JPY") == true: region = .jp
-        case let code where code?.contains("NZD") == true: region = .nz
-        case let code where code?.contains("TWD") == true: region = .tw
-        case let code where code?.contains("GBP") == true: region = .uk
-        default:                                          region = .other
+        if let inferredRegion = OCRService.simpleInferRegion(from: textToParse) {
+            region = inferredRegion
+        } else {
+            switch metadata.currency {
+            case let code where code?.contains("CNY") == true: region = .cn
+            case let code where code?.contains("USD") == true: region = .us
+            case let code where code?.contains("HKD") == true: region = .hk
+            case let code where code?.contains("JPY") == true: region = .jp
+            case let code where code?.contains("NZD") == true: region = .nz
+            case let code where code?.contains("TWD") == true: region = .tw
+            case let code where code?.contains("GBP") == true: region = .uk
+            default:                                          region = .other
+            }
         }
 
         let availableCards = try modelContext.fetch(FetchDescriptor<CreditCard>())

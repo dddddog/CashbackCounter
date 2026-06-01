@@ -38,38 +38,47 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let modelContext = ModelContext(Self.sharedModelContainer)
+        print("[AddTransactionFromScreenshotIntent] 🏁 快捷指令开始执行")
+        do {
+            let modelContext = ModelContext(Self.sharedModelContainer)
 
-        // 1. IntentFile → UIImage
-        let imageData = screenshot.data
-        guard let image = UIImage(data: imageData) else {
-            throw NSError(
+            // 1. IntentFile → UIImage
+            let imageData = screenshot.data
+            guard let image = UIImage(data: imageData) else {
+                print("[AddTransactionFromScreenshotIntent] ❌ 无法读取截图数据")
+                throw NSError(
                 domain: "AddTransactionFromScreenshotIntent",
                 code: 0,
                 userInfo: [NSLocalizedDescriptionKey: "无法读取截图数据"]
             )
         }
 
-        // 2. OCR 文字提取（Vision）
-        let broadLanguages = ["zh-Hans", "en-US", "ja-JP", "zh-Hant"]
-        let rawText = await OCRService.recognizeTextInRows(from: image, languages: broadLanguages)
+            // 2. OCR 文字提取（Vision）
+            print("[AddTransactionFromScreenshotIntent] 🔍 开始 OCR 文字提取")
+            let broadLanguages = ["zh-Hans", "en-US", "ja-JP", "zh-Hant"]
+            let rawText = await OCRService.recognizeTextInRows(from: image, languages: broadLanguages)
+            print("[AddTransactionFromScreenshotIntent] 🔍 OCR 结果:\n\(rawText)")
 
-        guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw NSError(
+            guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                print("[AddTransactionFromScreenshotIntent] ❌ 截图中未识别到文字内容")
+                throw NSError(
                 domain: "AddTransactionFromScreenshotIntent",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "截图中未识别到文字内容"]
             )
         }
 
-        // 3. AI 解析（独立 ReceiptParser，使用 try await 暴露错误）
-        let parser = ReceiptParser()
-        let metadata = try await parser.parse(text: rawText)
+            // 3. AI 解析（独立 ReceiptParser，使用 try await 暴露错误）
+            print("[AddTransactionFromScreenshotIntent] 🤖 开始 AI 解析")
+            let parser = ReceiptParser()
+            let metadata = try await parser.parseScreenshot(text: rawText)
+            print("[AddTransactionFromScreenshotIntent] 🤖 AI 解析完成: \(metadata)")
 
-        // 4. 核心字段检查
-        guard let merchant = metadata.merchant,
-              let amount = metadata.totalAmount else {
-            throw NSError(
+            // 4. 核心字段检查
+            guard let merchant = metadata.merchant,
+                  let amount = metadata.totalAmount else {
+                print("[AddTransactionFromScreenshotIntent] ❌ 未能从截图中识别出商户名或金额")
+                throw NSError(
                 domain: "AddTransactionFromScreenshotIntent",
                 code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "未能从截图中识别出商户名或金额"]
@@ -87,21 +96,27 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
             return formatter.date(from: dateStr) ?? Date()
         }()
 
-        // 5. 根据 currency 推断 Region
-        let region: Region
-        switch metadata.currency {
-        case let code where code?.contains("CNY") == true: region = .cn
-        case let code where code?.contains("USD") == true: region = .us
-        case let code where code?.contains("HKD") == true: region = .hk
-        case let code where code?.contains("JPY") == true: region = .jp
-        case let code where code?.contains("NZD") == true: region = .nz
-        case let code where code?.contains("TWD") == true: region = .tw
-        case let code where code?.contains("GBP") == true: region = .uk
-        case let code where code?.contains("MOP") == true: region = .mo
-        default:                                            region = .cn
-        }
+            // 5. 使用本地推断获取 Region，若失败则根据 currency 推断
+            let region: Region
+            if let inferredRegion = OCRService.simpleInferRegion(from: rawText) {
+                region = inferredRegion
+                print("[AddTransactionFromScreenshotIntent] 🌍 本地推断地区成功: \(region.rawValue)")
+            } else {
+                switch metadata.currency {
+                case let code where code?.contains("CNY") == true: region = .cn
+                case let code where code?.contains("USD") == true: region = .us
+                case let code where code?.contains("HKD") == true: region = .hk
+                case let code where code?.contains("JPY") == true: region = .jp
+                case let code where code?.contains("NZD") == true: region = .nz
+                case let code where code?.contains("TWD") == true: region = .tw
+                case let code where code?.contains("GBP") == true: region = .uk
+                case let code where code?.contains("MOP") == true: region = .mo
+                default:                                            region = .cn
+                }
+                print("[AddTransactionFromScreenshotIntent] 🌍 AI 推断地区: \(region.rawValue)")
+            }
 
-        // 6. 尝试匹配信用卡
+            // 6. 尝试匹配信用卡
         let availableCards = try modelContext.fetch(FetchDescriptor<CreditCard>())
         let selectedCard: CreditCard? = {
             if let last4 = metadata.cardLast4 {
@@ -150,36 +165,45 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
                     category: category,
                     location: region,
                     date: date,
-                    paymentMethod: .offline
+                    paymentMethod: .online
                 )
             }
         }
 
-        // 8. 请求用户确认
-        let currencySymbol = region.currencySymbol
-        let cardName = selectedCard != nil ? "\(selectedCard!.bankName)尾号\(selectedCard!.endNum)" : "默认分类"
-        let confirmDialog = IntentDialog("识别出：\(merchant) \(currencySymbol)\(String(format: "%.2f", amount))\n将记入 \(cardName)，是否确认？")
-        try await requestConfirmation(result: .result(dialog: confirmDialog))
+            // 8. 请求用户确认
+            let currencySymbol = region.currencySymbol
+            let cardName = selectedCard != nil ? "\(selectedCard!.bankName)尾号\(selectedCard!.endNum)" : "默认分类"
+            let confirmDialog = IntentDialog("识别出：\(merchant) \(currencySymbol)\(String(format: "%.2f", amount))\n将记入 \(cardName)，是否确认？")
+            print("[AddTransactionFromScreenshotIntent] 💬 请求用户确认...")
+            try await requestConfirmation(result: .result(dialog: confirmDialog))
+            print("[AddTransactionFromScreenshotIntent] 💬 用户已确认")
 
-        // 9. 创建并保存交易（附带截图作为收据）
-        let receiptData = image.jpegData(compressionQuality: 0.5)
-        let newTransaction = Transaction(
-            merchant: merchant,
-            category: category,
-            location: region,
-            amount: amount,
-            date: date,
-            card: selectedCard,
-            receiptData: receiptData,
-            billingAmount: billingAmount,
-            cashbackAmount: cashback,
-            pointsEarned: pointsEarned
-        )
-        modelContext.insert(newTransaction)
-        try modelContext.save()
+            // 9. 创建并保存交易（附带截图作为收据）
+            print("[AddTransactionFromScreenshotIntent] 💾 正在保存交易...")
+            let receiptData = image.jpegData(compressionQuality: 0.5)
+            let newTransaction = Transaction(
+                merchant: merchant,
+                category: category,
+                location: region,
+                amount: amount,
+                date: date,
+                card: selectedCard,
+                receiptData: receiptData,
+                billingAmount: billingAmount,
+                cashbackAmount: cashback,
+                pointsEarned: pointsEarned
+            )
+            modelContext.insert(newTransaction)
+            try modelContext.save()
 
-        // 10. 返回结果
-        return .result(dialog: "✅ 已添加：\(merchant) – \(currencySymbol)\(String(format: "%.2f", amount))")
+            // 10. 返回结果
+            print("[AddTransactionFromScreenshotIntent] ✅ 快捷指令执行成功！")
+            return .result(dialog: "✅ 已添加：\(merchant) – \(currencySymbol)\(String(format: "%.2f", amount))")
+        } catch {
+            print("[AddTransactionFromScreenshotIntent] ❌ 捕获到错误: \(error.localizedDescription)")
+            print("[AddTransactionFromScreenshotIntent] ❌ 详细错误: \(error)")
+            throw error
+        }
     }
 
     private func resolvePointValueInCardCurrency(pointProgram: Point?, cardCurrency: String) async -> Double {

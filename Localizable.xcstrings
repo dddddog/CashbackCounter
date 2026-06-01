@@ -1106,6 +1106,9 @@
         }
       }
     },
+    "上传卡面" : {
+
+    },
     "上传收据图片" : {
       "localizations" : {
         "en" : {
@@ -1877,7 +1880,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Card Wallet"
+            "value" : "Wallet"
           }
         },
         "zh-Hans" : {
@@ -2844,7 +2847,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Snap a transaction"
+            "value" : "Snap"
           }
         },
         "zh-Hans" : {
