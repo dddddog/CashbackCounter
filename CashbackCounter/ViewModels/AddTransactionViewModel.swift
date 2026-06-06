@@ -274,114 +274,97 @@ final class AddTransactionViewModel {
     // MARK: - Save
 
     @MainActor
-    func saveTransaction(cards: [CreditCard], context: ModelContext) async throws {
-        guard let amountDouble = Double(amount) else {
-            throw AddTransactionSaveError.invalidAmount
-        }
-        guard cards.indices.contains(selectedCardIndex) else {
-            throw AddTransactionSaveError.missingCard
-        }
-
+    func saveTransaction(cards: [CreditCard], context: ModelContext) async {
+        guard let amountDouble = Double(amount) else { return }
         let billingDouble = Double(billingAmountStr) ?? amountDouble
-        let card = cards[selectedCardIndex]
-        let imageData = receiptImage?.jpegData(compressionQuality: 0.5)
 
-        var finalCashback: Double = 0
-        var pointsEarned: Int = 0
+        if cards.indices.contains(selectedCardIndex) {
+            let card = cards[selectedCardIndex]
+            let imageData = receiptImage?.jpegData(compressionQuality: 0.5)
 
-        if card.rewardType == .points {
-            let pointValue = await resolvePointValueInCardCurrency(for: card)
-            let result = card.calculateCappedPoints(
-                amount: billingDouble,
-                category: selectedCategory,
-                location: location,
-                date: date,
-                paymentMethod: paymentMethod,
-                pointValueInCardCurrency: pointValue,
-                transactionToExclude: transactionToEdit
-            )
-            finalCashback = result.value
-            pointsEarned = result.points
-        } else {
-            finalCashback = card.calculateCappedCashback(
-                amount: billingDouble,
-                category: selectedCategory,
-                location: location,
-                date: date,
-                paymentMethod: paymentMethod,
-                transactionToExclude: transactionToEdit
-            )
-        }
+            var finalCashback: Double = 0
+            var pointsEarned: Int = 0
 
-        let nominalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
-
-        if let t = transactionToEdit {
-            // --- 编辑模式 ---
-            t.merchant = merchant
-            t.amount = amountDouble
-            t.location = location
-            t.date = date
-
-            if t.card != card ||
-                t.billingAmount != billingDouble ||
-                t.category != selectedCategory ||
-                t.paymentMethod != paymentMethod ||
-                t.date != date ||
-                t.cashbackamount != finalCashback ||
-                t.pointsEarned != pointsEarned {
-
-                t.card = card
-                t.billingAmount = billingDouble
-                t.category = selectedCategory
-                t.paymentMethod = paymentMethod
-
-                t.rate = nominalRate
-                t.cashbackamount = finalCashback
-                t.pointsEarned = pointsEarned
-            }
-
-            if let img = imageData { t.receiptData = img } else {
-                t.receiptData = nil
-            }
-
-        } else {
-            // --- 新建模式 ---
-            let newTransaction = Transaction(
-                merchant: merchant,
-                category: selectedCategory,
-                location: location,
-                amount: amountDouble,
-                date: date,
-                card: card,
-                receiptData: imageData,
-                billingAmount: billingDouble,
-                cashbackAmount: finalCashback,
-                pointsEarned: pointsEarned,
-                paymentMethod: paymentMethod
-            )
-            context.insert(newTransaction)
-
-            if card.transactions == nil {
-                card.transactions = [newTransaction]
+            if card.rewardType == .points {
+                let pointValue = await resolvePointValueInCardCurrency(for: card)
+                let result = card.calculateCappedPoints(
+                    amount: billingDouble,
+                    category: selectedCategory,
+                    location: location,
+                    date: date,
+                    paymentMethod: paymentMethod,
+                    pointValueInCardCurrency: pointValue,
+                    transactionToExclude: transactionToEdit
+                )
+                finalCashback = result.value
+                pointsEarned = result.points
             } else {
-                card.transactions?.append(newTransaction)
+                finalCashback = card.calculateCappedCashback(
+                    amount: billingDouble,
+                    category: selectedCategory,
+                    location: location,
+                    date: date,
+                    paymentMethod: paymentMethod,
+                    transactionToExclude: transactionToEdit
+                )
             }
-        }
 
-        try context.save()
-    }
-}
+            let nominalRate = card.getRate(for: selectedCategory, location: location, payment: paymentMethod)
 
-enum AddTransactionSaveError: LocalizedError {
-    case invalidAmount
-    case missingCard
+            if let t = transactionToEdit {
+                // --- 编辑模式 ---
+                t.merchant = merchant
+                t.amount = amountDouble
+                t.location = location
+                t.date = date
 
-    var errorDescription: String? {
-        switch self {
-        case .invalidAmount:
-            return "请输入有效的消费金额"
-        case .missingCard:
-            return "请选择用于保存交易的信用卡"
+                if t.card != card ||
+                    t.billingAmount != billingDouble ||
+                    t.category != selectedCategory ||
+                    t.paymentMethod != paymentMethod ||
+                    t.date != date ||
+                    t.cashbackamount != finalCashback ||
+                    t.pointsEarned != pointsEarned {
+
+                    t.card = card
+                    t.billingAmount = billingDouble
+                    t.category = selectedCategory
+                    t.paymentMethod = paymentMethod
+
+                    t.rate = nominalRate
+                    t.cashbackamount = finalCashback
+                    t.pointsEarned = pointsEarned
+                }
+
+                if let img = imageData { t.receiptData = img } else {
+                    t.receiptData = nil
+                }
+
+            } else {
+                // --- 新建模式 ---
+                let newTransaction = Transaction(
+                    merchant: merchant,
+                    category: selectedCategory,
+                    location: location,
+                    amount: amountDouble,
+                    date: date,
+                    card: card,
+                    receiptData: imageData,
+                    billingAmount: billingDouble,
+                    cashbackAmount: finalCashback,
+                    pointsEarned: pointsEarned,
+                    paymentMethod: paymentMethod
+                )
+                context.insert(newTransaction)
+
+                if card.transactions == nil {
+                    card.transactions = [newTransaction]
+                } else {
+                    card.transactions?.append(newTransaction)
+                }
+            }
+
+            try? context.save()
         }
     }
 }
