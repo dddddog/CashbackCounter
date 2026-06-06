@@ -23,10 +23,18 @@ struct AddTransactionFromSMSIntent: AppIntent {
     }
 
     private static let sharedModelContainer: ModelContainer = {
+        let schema = Schema([Transaction.self, CreditCard.self, Point.self, Income.self, PointAdjustment.self])
         do {
-            return try ModelContainer(for: Transaction.self, CreditCard.self, Point.self)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            fatalError("Failed to create shared model container: \(error)")
+            print("⚠️ Intent ModelContainer 创建失败，回退内存模式: \(error)")
+            do {
+                let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                return try ModelContainer(for: schema, configurations: [memConfig])
+            } catch {
+                fatalError("Intent 无法创建任何 ModelContainer: \(error)")
+            }
         }
     }()
 
@@ -61,17 +69,21 @@ struct AddTransactionFromSMSIntent: AppIntent {
             return formatter.date(from: dateStr) ?? Date()
         }()
 
-        // 根据 currency 推断 Region
+        // 使用本地推断获取 Region，若失败则根据 currency 推断
         let region: Region
-        switch metadata.currency {
-        case let code where code?.contains("CNY") == true: region = .cn
-        case let code where code?.contains("USD") == true: region = .us
-        case let code where code?.contains("HKD") == true: region = .hk
-        case let code where code?.contains("JPY") == true: region = .jp
-        case let code where code?.contains("NZD") == true: region = .nz
-        case let code where code?.contains("TWD") == true: region = .tw
-        case let code where code?.contains("GBP") == true: region = .uk
-        default:                                          region = .other
+        if let inferredRegion = OCRService.simpleInferRegion(from: textToParse) {
+            region = inferredRegion
+        } else {
+            switch metadata.currency {
+            case let code where code?.contains("CNY") == true: region = .cn
+            case let code where code?.contains("USD") == true: region = .us
+            case let code where code?.contains("HKD") == true: region = .hk
+            case let code where code?.contains("JPY") == true: region = .jp
+            case let code where code?.contains("NZD") == true: region = .nz
+            case let code where code?.contains("TWD") == true: region = .tw
+            case let code where code?.contains("GBP") == true: region = .uk
+            default:                                          region = .other
+            }
         }
 
         let availableCards = try modelContext.fetch(FetchDescriptor<CreditCard>())

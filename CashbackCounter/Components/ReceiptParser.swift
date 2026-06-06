@@ -50,6 +50,38 @@ final class ReceiptParser {
         "- Infer currency from symbols (¥, $, JPY) or location (e.g. Tokyo -> JPY)." // 👈 提示它根据东京推断日元
         "- If a value is missing, leave it nil."
     }
+
+    private let screenshotInstructions = Instructions{
+        let today = Date().formatted(date: .abbreviated, time: .omitted)
+        "Today is \(today). If you didn't find date details, use Today."
+        "You are an expert receipt data extractor for screen captures."
+        "Your job is to analyze the OCR text and extract key details into a structure."
+        "The text is aligned row by row. Items on the same row are usually related."
+        "CRITICAL RULES FOR MERCHANT NAME extraction:"
+        "- You can use Chinese, Japanese, English to get the MERCHANT NAME"
+        "- The MERCHANT NAME is usually at the top left corner."
+        
+        "CRITICAL RULES FOR AMOUNT extraction:"
+        "- You must extract one THE FIRST AMOUNT shown on the screen as amount."
+        "- IGNORE any discounts (立减/优惠/碰一下立减/Discount) below it or the Total(without discount) amount ."
+        "- DO NOT subtract discounts from the first amount. The first amount is the total billing amount."
+        "- IMPORTANT for JPY: JPY has no decimal places. If you see a dot in a number (e.g., '74.405' or '1.100'), treat it as a comma/thousands separator (74405, 1100). DO NOT treat it as a decimal."
+                
+        "CRITICAL RULES FOR CATEGORIZATION:"
+        "- Analyze the merchant name and items purchased."
+        "- 'dining': Restaurants, Cafes, Starbucks, Izakaya (居酒屋), Ramen (ラーメン)."
+        "- 'grocery': Supermarkets, 7-Eleven, Lawson, FamilyMart, Daily necessities."
+        "- 'travel': Uber, Taxi, Flights, Hotels, Suica, Pasmo, Shinkansen (新幹線)."
+        "- 'digital': Electronics, Apple Store, Yodobashi, Bic Camera."
+        "- 'streaming': Spotify, Disney+, Apple TV+, NBC, Amazon Prime."
+        "- 'other': Anything that doesn't fit above."
+        
+        "Rules:"
+        "- Extract exact values for merchant, amount, card ending number, merchant category, and date."
+        "- Infer currency from symbols (¥, $, JPY) or location (e.g. Tokyo -> JPY)."
+        "- If a value is missing, leave it nil."
+    }
+
     private let SMSinstructions = Instructions{
         "You are an expert receipt data extractor."
         
@@ -144,15 +176,36 @@ final class ReceiptParser {
             let response = try await session.respond(
                 generating: ReceiptMetadata.self
             ) {
-                "Analyze this receipt text:"
+                "Please analyze the following receipt text carefully. It may contain non-English characters such as Chinese or Japanese, but you must process it as part of this English prompt:"
+                "=== START OF RECEIPT DATA ==="
                 text
+                "=== END OF RECEIPT DATA ==="
             }
 
         let metadata = response.content
         let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
         print("OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), currency=\(metadata.currency ?? "nil"), date=\(metadata.dateString ?? "nil"), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
         return metadata
+    }
+
+    func parseScreenshot(text: String) async throws -> ReceiptMetadata {
+        let session = LanguageModelSession(instructions: screenshotInstructions)
+        
+        let response = try await session.respond(
+            generating: ReceiptMetadata.self
+        ) {
+            "Please analyze the following screenshot text carefully. It may contain non-English characters such as Chinese or Japanese, but you must process it as part of this English prompt:"
+            "=== START OF SCREENSHOT DATA ==="
+            text
+            "=== END OF SCREENSHOT DATA ==="
         }
+
+        let metadata = response.content
+        let amountText = metadata.totalAmount.map { String(format: "%.2f", $0) } ?? "nil"
+        print("Screenshot OCR fields: merchant=\(metadata.merchant ?? "nil"), amount=\(amountText), currency=\(metadata.currency ?? "nil"), date=\(metadata.dateString ?? "nil"), cardLast4=\(metadata.cardLast4 ?? "nil"), category=\(metadata.category?.rawValue ?? "nil")")
+        return metadata
+    }
+
     func SMSparse(text: String) async throws -> ReceiptMetadata {
             
             // 👇👇👇 核心修改：每次调用 parse 时，创建一个全新的 session！
@@ -162,8 +215,10 @@ final class ReceiptParser {
             let response = try await session.respond(
                 generating: ReceiptMetadata.self
             ) {
-                "Analyze this receipt text:"
+                "Please analyze the following SMS text carefully. It may contain non-English characters such as Chinese or Japanese, but you must process it as part of this English prompt:"
+                "=== START OF SMS DATA ==="
                 text
+                "=== END OF SMS DATA ==="
             }
 
         let metadata = response.content
@@ -228,3 +283,4 @@ final class ReceiptParser {
     }
 
 }
+

@@ -68,7 +68,7 @@ struct OCRService {
         if upperText.contains("HKD") || text.contains("HK$") { return .hk }
         if upperText.contains("TWD") || upperText.contains("NT$") { return .tw }
         if upperText.contains("NZD") { return .nz }
-        if upperText.contains("CNY") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
+        if upperText.contains("CN¥") || upperText.contains("RMB") || text.contains("人民币"){ return .cn }
         if upperText.contains("USD") { return .us }
         if upperText.contains("MOP") || upperText.contains("MACAU") { return .mo }
         if upperText.contains("EUR") || upperText.contains("EURO") || upperText.contains("€"){ return .other }
@@ -127,7 +127,11 @@ struct OCRService {
                     continuation.resume(returning: fullText)
                 }
                 request.recognitionLevel = .accurate
-                request.recognitionLanguages = languages
+                if let supported = try? request.supportedRecognitionLanguages() {
+                    request.recognitionLanguages = languages.filter { supported.contains($0) }
+                } else {
+                    request.recognitionLanguages = languages
+                }
                 do {
                     try requestHandler.perform([request])
                 } catch {
@@ -153,7 +157,11 @@ struct OCRService {
                     continuation.resume(returning: observations)
                 }
                 request.recognitionLevel = .accurate
-                request.recognitionLanguages = languages
+                if let supported = try? request.supportedRecognitionLanguages() {
+                    request.recognitionLanguages = languages.filter { supported.contains($0) }
+                } else {
+                    request.recognitionLanguages = languages
+                }
                 do {
                     try requestHandler.perform([request])
                 } catch {

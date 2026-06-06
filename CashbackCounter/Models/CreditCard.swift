@@ -33,6 +33,7 @@ class CreditCard: Identifiable {
     var bankName: String = ""
     var type: String = ""
     var endNum: String = ""
+    var memo: String = "" // 👈 新增：备注
     var repaymentDay: Int = 0
     var isRemindOpen: Bool = true // 默认为 true (直接开启)
     
@@ -95,6 +96,7 @@ class CreditCard: Identifiable {
         categoryCaps: [Category: Double] = [:], // 改为单字典
         capPeriod: CapPeriod = CapPeriod.yearly,
         repaymentDay: Int = 0,
+        memo: String = "", // 👈 新增参数
         isRemindOpen: Bool = true,
         paymentMethodRates: [PaymentMethod: Double] = [:],
         paymentCaps: [PaymentMethod: Double] = [:],
@@ -118,6 +120,7 @@ class CreditCard: Identifiable {
         self.capPeriod = capPeriod
         self.categoryCaps = categoryCaps
         self.repaymentDay = repaymentDay
+        self.memo = memo // 👈 赋值
         self.isRemindOpen = isRemindOpen
         self.paymentMethodRates = paymentMethodRates
         self.paymentCaps = paymentCaps

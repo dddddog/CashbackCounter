@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct AddCardView: View {
     @Environment(\.modelContext) var context
@@ -22,6 +23,7 @@ struct AddCardView: View {
     
     // ViewModel
     @State private var viewModel: AddCardViewModel
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
     
     // --- 2. 核心：自定义初始化 ---
     init(template: CardTemplate? = nil, cardToEdit: CreditCard? = nil, onSaved: (() -> Void)? = nil) {
@@ -37,13 +39,46 @@ struct AddCardView: View {
                 // 1. 实时预览
                 Section {
                     VStack(spacing: 12) {
-                        CreditCardView(
-                            bankName: viewModel.bankName.isEmpty ? "银行名称" : viewModel.bankName,
-                            type: viewModel.cardType.isEmpty ? "卡种" : viewModel.cardType,
-                            endNum: viewModel.endNum.isEmpty ? "8888" : viewModel.endNum,
-                            colors: [viewModel.color1, viewModel.color2],
-                            cardImageData: viewModel.cardImageData
-                        )
+                        ZStack(alignment: .topTrailing) {
+                            CreditCardView(
+                                bankName: viewModel.bankName.isEmpty ? "银行名称" : viewModel.bankName,
+                                type: viewModel.cardType.isEmpty ? "卡种" : viewModel.cardType,
+                                endNum: viewModel.endNum.isEmpty ? "8888" : viewModel.endNum,
+                                colors: [viewModel.color1, viewModel.color2],
+                                cardImageData: viewModel.cardImageData
+                            )
+                            
+                            // 👇 卡面图片操作按钮
+                            if viewModel.cardImageData != nil {
+                                // 已有卡面 → 显示删除按钮
+                                Button {
+                                    withAnimation { viewModel.cardImageData = nil }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.5))
+                                }
+                                .padding(24)
+                            } else {
+                                // 无卡面 → 显示上传按钮
+                                Button {
+                                    viewModel.showPhotoPicker = true
+                                } label: {
+                                    VStack(spacing: 6) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 32))
+                                        Text("上传卡面")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                    }
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
+                                .padding(.horizontal)
+                                .frame(height: 220)
+                            }
+                        }
                         
                         if imageManager.isDownloading {
                             ProgressView("正在下载卡面...", value: imageManager.downloadProgress, total: 1.0)
@@ -70,6 +105,7 @@ struct AddCardView: View {
                         .onChange(of: viewModel.endNum) { oldValue, newValue in
                             if newValue.count > 4 { viewModel.endNum = String(newValue.prefix(4)) }
                         }
+                    TextField("备注 (可选)", text: $viewModel.memo)
                 }
                 
                 HStack {
@@ -265,6 +301,22 @@ struct AddCardView: View {
             }
             .sheet(isPresented: $viewModel.showPointLibrary) {
                 PointLibraryView()
+            }
+            .photosPicker(isPresented: $viewModel.showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let uiImage = UIImage(data: data) {
+                        let compressed = uiImage.jpegData(compressionQuality: AppConfig.receiptJPEGQuality)
+                        await MainActor.run {
+                            withAnimation {
+                                viewModel.cardImageData = compressed
+                            }
+                        }
+                    }
+                    selectedPhotoItem = nil
+                }
             }
         }
     }
