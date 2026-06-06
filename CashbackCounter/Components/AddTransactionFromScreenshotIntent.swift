@@ -29,10 +29,18 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
     }
 
     private static let sharedModelContainer: ModelContainer = {
+        let schema = Schema([Transaction.self, CreditCard.self, Point.self, Income.self, PointAdjustment.self])
         do {
-            return try ModelContainer(for: Transaction.self, CreditCard.self, Point.self)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            fatalError("Failed to create shared model container: \(error)")
+            print("⚠️ Intent ModelContainer 创建失败，回退内存模式: \(error)")
+            do {
+                let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                return try ModelContainer(for: schema, configurations: [memConfig])
+            } catch {
+                fatalError("Intent 无法创建任何 ModelContainer: \(error)")
+            }
         }
     }()
 

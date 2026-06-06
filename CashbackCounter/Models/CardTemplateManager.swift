@@ -103,12 +103,15 @@ final class CardTemplateManager {
     func deduplicateCards(in context: ModelContext) {
         do {
             let cards = try context.fetch(FetchDescriptor<CreditCard>())
+            guard cards.count > 1 else { return }
             
             // 按银行名、卡种名称和尾号进行分组（忽略首尾空格和大小写）
             var grouped: [String: [CreditCard]] = [:]
             for card in cards {
+                // 防御：跳过 CloudKit 同步中尚未完全填充的「幽灵记录」
                 let bank = card.bankName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let type = card.type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                guard !bank.isEmpty, !type.isEmpty else { continue }
                 let endNum = card.endNum.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let key = "\(bank)|\(type)|\(endNum)"
                 grouped[key, default: []].append(card)

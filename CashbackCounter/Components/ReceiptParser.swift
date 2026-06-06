@@ -52,8 +52,9 @@ final class ReceiptParser {
     }
 
     private let screenshotInstructions = Instructions{
+        let today = Date().formatted(date: .abbreviated, time: .omitted)
+        "Today is \(today). If you didn't find date details, use Today."
         "You are an expert receipt data extractor for screen captures."
-        
         "Your job is to analyze the OCR text and extract key details into a structure."
         "The text is aligned row by row. Items on the same row are usually related."
         "CRITICAL RULES FOR MERCHANT NAME extraction:"
@@ -61,8 +62,8 @@ final class ReceiptParser {
         "- The MERCHANT NAME is usually at the top left corner."
         
         "CRITICAL RULES FOR AMOUNT extraction:"
-        "- You must extract the VERY FIRST AMOUNT shown on the screen as the total amount."
-        "- IGNORE any discounts (立减/优惠/碰一下立减/Discount) below it."
+        "- You must extract one THE FIRST AMOUNT shown on the screen as amount."
+        "- IGNORE any discounts (立减/优惠/碰一下立减/Discount) below it or the Total(without discount) amount ."
         "- DO NOT subtract discounts from the first amount. The first amount is the total billing amount."
         "- IMPORTANT for JPY: JPY has no decimal places. If you see a dot in a number (e.g., '74.405' or '1.100'), treat it as a comma/thousands separator (74405, 1100). DO NOT treat it as a decimal."
                 
@@ -282,3 +283,4 @@ final class ReceiptParser {
     }
 
 }
+
