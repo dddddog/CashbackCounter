@@ -12,6 +12,7 @@ struct AddTransactionView: View {
     
     // ViewModel
     @State private var viewModel: AddTransactionViewModel
+    @State private var saveController = AddTransactionSaveController()
     
     // --- 3. 自定义初始化 ---
     init(
@@ -191,15 +192,42 @@ struct AddTransactionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button {
                         Task {
-                            await viewModel.saveTransaction(cards: cards, context: context)
-                            dismiss()
-                            onSaved?()
+                            await saveController.save(
+                                operation: {
+                                    try await viewModel.saveTransaction(cards: cards, context: context)
+                                },
+                                dismiss: { dismiss() },
+                                onSaved: onSaved
+                            )
+                        }
+                    } label: {
+                        if saveController.isSaving {
+                            ProgressView()
+                        } else {
+                            Text("保存")
                         }
                     }
-                        .disabled(viewModel.merchant.isEmpty || viewModel.amount.isEmpty || cards.isEmpty)
+                    .disabled(
+                        viewModel.merchant.isEmpty ||
+                            viewModel.amount.isEmpty ||
+                            cards.isEmpty ||
+                            saveController.isSaving
+                    )
                 }
+            }
+            .alert("保存失败", isPresented: Binding(
+                get: { saveController.isShowingErrorAlert },
+                set: { isPresented in
+                    if !isPresented {
+                        saveController.errorMessage = nil
+                    }
+                }
+            )) {
+                Button("确定", role: .cancel) {}
+            } message: {
+                Text(saveController.errorMessage ?? "请稍后重试")
             }
             .onAppear {
                 if let t = viewModel.transactionToEdit, let card = t.card,
@@ -242,6 +270,37 @@ struct AddTransactionView: View {
             .sheet(isPresented: $viewModel.showImagePicker) {
                 ImagePicker(selectedImage: $viewModel.receiptImage, sourceType: .photoLibrary)
             }
+        }
+    }
+}
+
+@Observable
+final class AddTransactionSaveController {
+    var isSaving = false
+    var errorMessage: String?
+
+    var isShowingErrorAlert: Bool {
+        errorMessage != nil
+    }
+
+    @MainActor
+    func save(
+        operation: () async throws -> Void,
+        dismiss: () -> Void,
+        onSaved: (() -> Void)?
+    ) async {
+        guard !isSaving else { return }
+
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        do {
+            try await operation()
+            dismiss()
+            onSaved?()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
