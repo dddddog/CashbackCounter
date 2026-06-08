@@ -4852,7 +4852,6 @@
       }
     },
     "解析短信文本 ${smsText}" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4951,7 +4950,6 @@
       }
     },
     "识别截图 ${screenshot} 并记账" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
