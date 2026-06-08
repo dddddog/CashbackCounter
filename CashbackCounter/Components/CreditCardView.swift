@@ -26,7 +26,7 @@ struct CreditCardView: View {
                 // 2. 装饰纹理
                 Circle()
                     .fill(Color.white.opacity(0.1))
-                    .frame(width: 200, height: 220)
+                    .frame(width: 200, height: DesignConstants.CardList.cardHeight)
                     .offset(x: 150, y: -50)
                 
                 // 3. 图片层（✅ 修改：使用异步解码后的 State）
@@ -34,7 +34,7 @@ struct CreditCardView: View {
                     Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 220)
+                        .frame(height: DesignConstants.CardList.cardHeight)
                         // ✅ 关键修复：限制图片最大宽度，防止宽图撑爆布局导致 GeometryReader 坐标错乱
                         .frame(maxWidth: proxy.size.width)
                         .clipped()
@@ -67,7 +67,7 @@ struct CreditCardView: View {
                 .foregroundColor(.white)
             }
         }
-        .frame(height: 220)
+        .frame(height: DesignConstants.CardList.cardHeight)
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
         .padding(.horizontal)

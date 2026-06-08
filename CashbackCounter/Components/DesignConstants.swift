@@ -89,6 +89,40 @@ enum DesignConstants {
         static var dropIndicatorIcon: CGFloat { DesignConstants.isCompact ? 64 : 80 }
     }
 
+    // MARK: - 卡片列表布局 (基于屏幕宽度动态计算)
+
+    enum CardList {
+        /// 卡片可用宽度 = 屏幕宽度 - 两侧水平 padding (默认各 16pt)
+        private static var cardWidth: CGFloat { screenWidth - 32 }
+
+        /// 信用卡标准比例 (ISO/IEC 7810 ID-1: 85.6 × 53.98 mm ≈ 1.586)
+        private static let cardAspectRatio: CGFloat = 1.586
+
+        /// 单张卡片高度 — 由宽度 / 标准银行卡比例动态得出
+        static var cardHeight: CGFloat { cardWidth / cardAspectRatio }
+
+        /// 卡片堆叠时，相邻卡片之间的垂直偏移（露出约 45% 的高度）
+        static var stackOffset: CGFloat { cardHeight * 0.45 }
+
+        /// 选中卡片后，卡片停靠的顶部偏移
+        static var selectedTopInset: CGFloat { cardHeight * 0.55 }
+
+        /// 未选中卡片隐藏到屏幕外的偏移量
+        static var detailPushDistance: CGFloat { screenWidth * 2 }
+
+        /// 卡片列表首张卡片的顶部间距
+        static var listTopPadding: CGFloat { 20 }
+
+        /// 底部占位区域需要的每张卡片高度贡献
+        static var placeholderPerCard: CGFloat { stackOffset + listTopPadding }
+
+        /// 交易列表距离顶部的偏移 — 留出刚好一张卡的空间
+        static var transactionListTopPadding: CGFloat { cardHeight + 10 }
+
+        /// 关闭按钮区域高度 — 与卡片高度一致
+        static var closeOverlayHeight: CGFloat { cardHeight }
+    }
+
     // MARK: - 字体大小 (动态)
 
     enum FontSize {

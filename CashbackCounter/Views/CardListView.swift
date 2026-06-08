@@ -40,7 +40,7 @@ struct CardListView: View {
                     ScrollView(showsIndicators: false) {
                         EmbeddedTransactionListView(card: selectedCard)
                     }
-                    .padding(.top, 220)
+                    .padding(.top, DesignConstants.CardList.transactionListTopPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(0)
                 }
@@ -65,9 +65,9 @@ struct CardListView: View {
                             // 控制位置和动画
                             .offset(y: isSelected
                                     // 选中时：停在当前滚动位置 + 顶部留白
-                                    ? (viewModel.scrollOffset + 120)
+                                    ? (viewModel.scrollOffset + DesignConstants.CardList.selectedTopInset)
                                     // 未选中时：正常列表逻辑
-                                    : (viewModel.isDetailMode ? 800 : CGFloat(index * 100 + 20))
+                                    : (viewModel.isDetailMode ? DesignConstants.CardList.detailPushDistance : CGFloat(index) * DesignConstants.CardList.stackOffset + DesignConstants.CardList.listTopPadding)
                             )
                             // 控制透明度和缩放
                             .opacity(viewModel.isDetailMode && !isSelected ? 0 : 1)
@@ -85,7 +85,7 @@ struct CardListView: View {
                         
                         // 底部占位，保证最后一张卡片能显示完整
                         Color.clear
-                            .frame(height: CGFloat(max(1, cards.count) * 120 + 20 ))
+                            .frame(height: CGFloat(max(1, cards.count)) * DesignConstants.CardList.placeholderPerCard + DesignConstants.CardList.listTopPadding )
                     }
                 }
                 // ✅ 新增：iOS 18 原生滚动监听
@@ -106,7 +106,7 @@ struct CardListView: View {
                 if viewModel.isDetailMode {
                     Color.clear // 透明色
                         .contentShape(Rectangle()) // 只有定义了形状才能响应点击
-                        .frame(height: 220) // 高度与卡片一致
+                        .frame(height: DesignConstants.CardList.closeOverlayHeight) // 高度与卡片一致
                         .padding(.horizontal, 16)
                         .padding(.top, 10) // 🔥 重要：必须和卡片的 offset 顶部距离一致
                         .zIndex(2) // 放在最顶层
@@ -240,11 +240,11 @@ struct EmbeddedTransactionListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             
-            Text("最新交易")
+            Text("")
                 .font(.headline)
                 .foregroundColor(.secondary)
                 .padding(.leading, 16)
-                .padding(.top, 10)
+                .padding(.top, 5)
             
             if sortedTransactions.isEmpty {
                 VStack(spacing: 12) {
