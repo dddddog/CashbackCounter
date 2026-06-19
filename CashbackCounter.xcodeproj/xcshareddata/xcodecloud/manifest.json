@@ -1,0 +1,9 @@
+{
+  "id" : "8ecee672-e308-4ee5-8b82-a24681666ff0",
+  "targets" : [
+    {
+      "id" : "1D4063B7-4E02-437D-BBD1-418B2D5036AE",
+      "name" : "CashbackCounter"
+    }
+  ]
+}

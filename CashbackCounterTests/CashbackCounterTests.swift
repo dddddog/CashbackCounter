@@ -288,4 +288,180 @@ final class CashbackCounterTests: XCTestCase {
         XCTAssertEqual(result.points, 125)
     }
 
+    // MARK: - 6. 🐛 Category 封顶但 Base/Payment 应继续计算
+
+    /// 场景：Category 已被历史交易耗尽上限，但 Base 无上限 → 新交易仍应获得 Base 返现
+    func testCategoryCapExhausted_BaseStillWorks_NoCap() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05],
+            categoryCaps: [.dining: 20]  // 餐饮加成上限 20
+            // localBaseCap = 0 → 基础无上限
+        )
+        let now = Date()
+
+        // 历史交易：刷满餐饮上限 (500 * 0.05 = 25 > 20)
+        _ = makeTransaction(card: card, amount: 500, category: .dining, date: now)
+
+        // 新交易 1000 元餐饮
+        // 期望：基础 1000*0.01=10 + 餐饮加成 0 (已封顶) = 10
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .dining, location: .hk,
+            date: now, paymentMethod: .offline, transactionToExclude: nil
+        )
+        XCTAssertEqual(cashback, 10.0, accuracy: 0.0001,
+            "Category 封顶后，Base 返现应继续计算")
+    }
+
+    /// 场景：Category 封顶 + Base 有上限但未耗尽 + Payment 有上限但未耗尽
+    func testCategoryCapExhausted_BaseAndPaymentStillWork() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05],
+            paymentMethodRates: [.applePay: 0.03],
+            localBaseCap: 500,          // 基础上限 500
+            categoryCaps: [.dining: 50], // 餐饮上限 50
+            paymentCaps: [.applePay: 200] // ApplePay 上限 200
+        )
+        let now = Date()
+
+        // 3 笔历史交易，每笔 1000 元餐饮 + ApplePay
+        // 理论类别加成: 3 * 1000 * 0.05 = 150 → 超过上限 50
+        // 理论 Base 用量: 3 * 1000 * 0.01 = 30 → 上限 500，剩余 470
+        // 理论 Payment 用量: 3 * 1000 * 0.03 = 90 → 上限 200，剩余 110
+        for _ in 0..<3 {
+            _ = makeTransaction(card: card, amount: 1000, category: .dining,
+                                paymentMethod: .applePay, date: now)
+        }
+
+        // 新交易 1000 元餐饮 + ApplePay
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .dining, location: .hk,
+            date: now, paymentMethod: .applePay, transactionToExclude: nil
+        )
+        // 期望：Base min(10, 470)=10 + Category min(50, 0)=0 + Payment min(30, 110)=30 = 40
+        XCTAssertEqual(cashback, 40.0, accuracy: 0.0001,
+            "Category 封顶后，Base 和 Payment 应继续正常计算")
+    }
+
+    /// 场景：Category 封顶 + Base 无上限 + Payment 无上限
+    func testCategoryCapExhausted_BaseAndPaymentUnlimited() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05],
+            paymentMethodRates: [.online: 0.02],
+            categoryCaps: [.dining: 10]  // 很低的餐饮上限
+            // localBaseCap = 0, paymentCaps = [:] → 都无上限
+        )
+        let now = Date()
+
+        // 历史: 2 笔 500 元餐饮 (理论类别: 2*500*0.05=50 > 上限 10)
+        for _ in 0..<2 {
+            _ = makeTransaction(card: card, amount: 500, category: .dining,
+                                paymentMethod: .online, date: now)
+        }
+
+        // 新交易 800 元餐饮
+        let cashback = card.calculateCappedCashback(
+            amount: 800, category: .dining, location: .hk,
+            date: now, paymentMethod: .online, transactionToExclude: nil
+        )
+        // 期望：Base 800*0.01=8 + Category 0 + Payment 800*0.02=16 = 24
+        XCTAssertEqual(cashback, 24.0, accuracy: 0.0001,
+            "Category 封顶后，Base 和 Payment（无上限）应照常返现")
+    }
+
+    /// 场景：Category 和 Payment 同时封顶，但 Base 没封顶
+    func testCategoryAndPaymentCapped_BaseStillWorks() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05],
+            paymentMethodRates: [.applePay: 0.03],
+            localBaseCap: 1000,
+            categoryCaps: [.dining: 10],
+            paymentCaps: [.applePay: 5]
+        )
+        let now = Date()
+
+        // 大额历史交易耗尽 category 和 payment
+        _ = makeTransaction(card: card, amount: 5000, category: .dining,
+                            paymentMethod: .applePay, date: now)
+
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .dining, location: .hk,
+            date: now, paymentMethod: .applePay, transactionToExclude: nil
+        )
+        // 期望：Base min(10, 1000-50)=10 + Category 0 + Payment 0 = 10
+        XCTAssertEqual(cashback, 10.0, accuracy: 0.0001,
+            "Category+Payment 都封顶，Base 应继续计算")
+    }
+
+    /// 场景：只有 Category 有上限且已满，其他维度都没有上限
+    func testOnlyCategoryCap_ExhaustedByHistory() {
+        let card = makeCard(
+            defaultRate: 0.02,
+            specialRates: [.grocery: 0.08],
+            paymentMethodRates: [.online: 0.01],
+            categoryCaps: [.grocery: 100]
+            // 无 base cap, 无 payment cap
+        )
+        let now = Date()
+
+        // 历史: 5 笔 500 元超市 → 理论类别 5*500*0.08 = 200 > 上限 100
+        for _ in 0..<5 {
+            _ = makeTransaction(card: card, amount: 500, category: .grocery,
+                                paymentMethod: .online, date: now)
+        }
+
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .grocery, location: .hk,
+            date: now, paymentMethod: .online, transactionToExclude: nil
+        )
+        // 期望：Base 1000*0.02=20 + Category 0 + Payment 1000*0.01=10 = 30
+        XCTAssertEqual(cashback, 30.0, accuracy: 0.0001,
+            "只有 Category 设了上限且已满，其他应不受影响")
+    }
+
+    /// 场景：Category 的加成上限恰好被历史交易精确耗尽
+    func testCategoryCapExactlyExhausted() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05],
+            categoryCaps: [.dining: 25]  // 恰好 500*0.05=25
+        )
+        let now = Date()
+
+        // 历史: 恰好用完
+        _ = makeTransaction(card: card, amount: 500, category: .dining, date: now)
+
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .dining, location: .hk,
+            date: now, paymentMethod: .offline, transactionToExclude: nil
+        )
+        // 期望：Base 10 + Category 0 = 10
+        XCTAssertEqual(cashback, 10.0, accuracy: 0.0001)
+    }
+
+    /// 场景：不同类别的 cap 不应互相影响
+    func testDifferentCategoryCaps_NoInterference() {
+        let card = makeCard(
+            defaultRate: 0.01,
+            specialRates: [.dining: 0.05, .grocery: 0.03],
+            categoryCaps: [.dining: 10, .grocery: 50]
+        )
+        let now = Date()
+
+        // 历史: 大量餐饮消费耗尽餐饮上限
+        _ = makeTransaction(card: card, amount: 5000, category: .dining, date: now)
+
+        // 新交易: 超市 → 超市的上限不应被餐饮影响
+        let cashback = card.calculateCappedCashback(
+            amount: 1000, category: .grocery, location: .hk,
+            date: now, paymentMethod: .offline, transactionToExclude: nil
+        )
+        // 期望：Base 1000*0.01=10 + Category(grocery) min(30, 50)=30 = 40
+        XCTAssertEqual(cashback, 40.0, accuracy: 0.0001,
+            "餐饮封顶不应影响超市类别的计算")
+    }
+
 }

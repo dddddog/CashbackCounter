@@ -145,31 +145,33 @@ struct OCRService {
     static func recognizeObservations(from image: UIImage, languages: [String]) async -> [VNRecognizedTextObservation] {
         guard let cgImage = image.cgImage else { return [] }
         let orientation = cgImageOrientation(from: image.imageOrientation)
-
+        
+        
         return await withCheckedContinuation { continuation in
-            Task.detached {
-                let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
-                let request = VNRecognizeTextRequest { request, error in
-                    guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
-                        continuation.resume(returning: [])
-                        return
+                Task.detached {
+                    let requestHandler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
+                    let request = VNRecognizeTextRequest { request, error in
+                        guard let observations = request.results as? [VNRecognizedTextObservation], error == nil else {
+                            continuation.resume(returning: [])
+                            return
+                        }
+                        continuation.resume(returning: observations)
                     }
-                    continuation.resume(returning: observations)
-                }
-                request.recognitionLevel = .accurate
-                if let supported = try? request.supportedRecognitionLanguages() {
-                    request.recognitionLanguages = languages.filter { supported.contains($0) }
-                } else {
-                    request.recognitionLanguages = languages
-                }
-                do {
-                    try requestHandler.perform([request])
-                } catch {
-                    print("Vision OCR 错误: \(error)")
-                    continuation.resume(returning: [])
+                    request.recognitionLevel = .accurate
+                    if let supported = try? request.supportedRecognitionLanguages() {
+                        request.recognitionLanguages = languages.filter { supported.contains($0) }
+                    } else {
+                        request.recognitionLanguages = languages
+                    }
+                    do {
+                        try requestHandler.perform([request])
+                    } catch {
+                        print("Vision OCR 错误: \(error)")
+                        continuation.resume(returning: [])
+                    }
                 }
             }
-        }
+        
     }
 
     static func reconstructRows(from observations: [VNRecognizedTextObservation]) -> [RecognizedRow] {

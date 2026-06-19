@@ -9,8 +9,8 @@ enum TrendType {
     
     var title: String {
         switch self {
-        case .expense : return "支出"
-        case .cashback: return "返现"
+        case .expense : return String(localized: "支出")
+        case .cashback: return String(localized: "返现")
         }
     }
     
@@ -29,6 +29,14 @@ struct MonthlyData: Identifiable {
     let amount: Double
 }
 
+// 扇形图数据点
+struct PieSliceData: Identifiable {
+    let id = UUID()
+    let label: String
+    let amount: Double
+    let color: Color
+}
+
 struct TrendAnalysisView: View {
     @Environment(\.dismiss) var dismiss
     @AppStorage("mainCurrencyCode") private var mainCurrencyCode: String = "CNY"
@@ -41,7 +49,6 @@ struct TrendAnalysisView: View {
     // 👇 核心：当前分析的类型 (由外部传入)
     let type: TrendType
     
-    @State private var selectedCard: CreditCard? = nil
     @State private var selectedDate: Date? = nil
     
     // 可滚动 & 可缩放图表状态
@@ -76,14 +83,7 @@ struct TrendAnalysisView: View {
         let now = Date()
         
         // 确定最早的交易月份
-        let relevantTransactions: [Transaction]
-        if let selectedCard {
-            relevantTransactions = transactions.filter { $0.card == selectedCard }
-        } else {
-            relevantTransactions = transactions
-        }
-        
-        guard let earliest = relevantTransactions.map({ $0.date }).min() else { return [] }
+        guard let earliest = transactions.map({ $0.date }).min() else { return [] }
         
         let nowComponents = calendar.dateComponents([.year, .month], from: now)
         let earliestComponents = calendar.dateComponents([.year, .month], from: earliest)
@@ -102,9 +102,7 @@ struct TrendAnalysisView: View {
                 // 筛选
                 let monthlyTransactions = transactions.filter { t in
                     let tComponents = calendar.dateComponents([.year, .month], from: t.date)
-                    let isSameMonth = tComponents.year == components.year && tComponents.month == components.month
-                    let isCardMatch = (selectedCard == nil) || (t.card == selectedCard)
-                    return isSameMonth && isCardMatch
+                    return tComponents.year == components.year && tComponents.month == components.month
                 }
                 
                 // 计算总额 (根据类型区分逻辑)
@@ -129,6 +127,68 @@ struct TrendAnalysisView: View {
             }
         }
         return data.reversed()
+    }
+    
+    // MARK: - 扇形图数据
+    
+    /// 按卡片分组的消费/返现数据
+    var cardPieData: [PieSliceData] {
+        var grouped: [String: (amount: Double, color: Color)] = [:]
+        
+        for t in transactions {
+            let cardName: String
+            let cardColor: Color
+            if let card = t.card {
+                cardName = card.bankName
+                cardColor = card.colors.first ?? .gray
+            } else {
+                cardName = String(localized: "未分类")
+                cardColor = .gray
+            }
+            
+            let value: Double
+            let currencyCode: String
+            if type == .expense {
+                value = t.billingAmount
+                currencyCode = billingCurrencyCode(for: t)
+            } else {
+                value = CashbackService.calculateCashback(for: t)
+                currencyCode = t.card?.issueRegion.currencyCode ?? mainCurrencyCode
+            }
+            let rate = exchangeRate(for: currencyCode)
+            let converted = value / rate
+            
+            let existing = grouped[cardName] ?? (amount: 0, color: cardColor)
+            grouped[cardName] = (amount: existing.amount + converted, color: existing.color)
+        }
+        
+        return grouped
+            .map { PieSliceData(label: $0.key, amount: $0.value.amount, color: $0.value.color) }
+            .sorted { $0.amount > $1.amount }
+    }
+    
+    /// 按消费类别分组的消费/返现数据
+    var categoryPieData: [PieSliceData] {
+        var grouped: [Category: Double] = [:]
+        
+        for t in transactions {
+            let value: Double
+            let currencyCode: String
+            if type == .expense {
+                value = t.billingAmount
+                currencyCode = billingCurrencyCode(for: t)
+            } else {
+                value = CashbackService.calculateCashback(for: t)
+                currencyCode = t.card?.issueRegion.currencyCode ?? mainCurrencyCode
+            }
+            let rate = exchangeRate(for: currencyCode)
+            let converted = value / rate
+            grouped[t.category, default: 0] += converted
+        }
+        
+        return grouped
+            .map { PieSliceData(label: $0.key.displayName, amount: $0.value, color: $0.key.color) }
+            .sorted { $0.amount > $1.amount }
     }
 
     // MARK: - 统计数据
@@ -155,12 +215,9 @@ struct TrendAnalysisView: View {
     }
 
     private func peakMonthLabel(for date: Date?) -> String {
-        guard let date else { return "暂无数据" }
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar.current
-        formatter.locale = Locale.current
-        formatter.dateFormat = "MM月峰值"
-        return formatter.string(from: date)
+        guard let date else { return String(localized: "暂无数据") }
+        let month = date.formatted(.dateTime.month(.twoDigits))
+        return String(localized: "\(month)月峰值")
     }
 
     private func formattedCurrencyInteger(_ amount: Double) -> String {
@@ -226,18 +283,14 @@ struct TrendAnalysisView: View {
     
     var body: some View {
         NavigationView {
+            ScrollView {
             VStack(spacing: 20) {
                 
                 // --- 1. 图表区域 ---
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        if let card = selectedCard {
-                            Text("\(card.bankName) \(type.title)趋势")
-                                .font(.headline)
-                        } else {
-                            Text("总\(type.title)趋势")
-                                .font(.headline)
-                        }
+                        Text("总\(type.title)趋势")
+                            .font(.headline)
                         Spacer()
                         if let highlighted = highlightedData {
                             Text(highlighted.date, format: .dateTime.year().month())
@@ -284,18 +337,18 @@ struct TrendAnalysisView: View {
                     // 三列式的数据仪表盘卡片网格
                     HStack(spacing: 8) {
                         statCard(
-                            title: "全部累计",
+                            title: String(localized: "全部累计"),
                             value: formattedCurrencyInteger(totalAmount),
                             subtitle: monthRangeText.isEmpty ? nil : monthRangeText,
                             highlightColor: type.color
                         )
                         statCard(
-                            title: "月均水平",
+                            title: String(localized: "月均水平"),
                             value: formattedCurrencyInteger(totalAmount / Double(totalMonthCount)),
-                            subtitle: "月均\(type.title)"
+                            subtitle: String(localized: "月均\(type.title)")
                         )
                         statCard(
-                            title: "单月最高",
+                            title: String(localized: "单月最高"),
                             value: formattedCurrencyInteger(peakMonthData?.amount ?? 0.0),
                             subtitle: peakMonthLabel(for: peakMonthData?.date)
                         )
@@ -306,8 +359,8 @@ struct TrendAnalysisView: View {
                         ForEach(chartData) { item in
                             // 线条
                             LineMark(
-                                x: .value("月份", item.date, unit: .month),
-                                y: .value("金额", item.amount)
+                                x: .value(String(localized: "月份"), item.date, unit: .month),
+                                y: .value(String(localized: "金额"), item.amount)
                             )
                             .interpolationMethod(.monotone)
                             .foregroundStyle(type.color.gradient)
@@ -315,8 +368,8 @@ struct TrendAnalysisView: View {
                             
                             // 渐变填充
                             AreaMark(
-                                x: .value("月份", item.date, unit: .month),
-                                y: .value("金额", item.amount)
+                                x: .value(String(localized: "月份"), item.date, unit: .month),
+                                y: .value(String(localized: "金额"), item.amount)
                             )
                             .interpolationMethod(.monotone)
                             .foregroundStyle(
@@ -329,8 +382,8 @@ struct TrendAnalysisView: View {
                             
                             // 数据点
                             PointMark(
-                                x: .value("月份", item.date, unit: .month),
-                                y: .value("金额", item.amount)
+                                x: .value(String(localized: "月份"), item.date, unit: .month),
+                                y: .value(String(localized: "金额"), item.amount)
                             )
                             .foregroundStyle(type.color)
                             .symbolSize(16)
@@ -338,14 +391,14 @@ struct TrendAnalysisView: View {
 
                         if let highlighted = highlightedData {
                             RuleMark(
-                                x: .value("选中月份", highlighted.date, unit: .month)
+                                x: .value(String(localized: "选中月份"), highlighted.date, unit: .month)
                             )
                             .foregroundStyle(.secondary.opacity(0.3))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                             PointMark(
-                                x: .value("月份", highlighted.date, unit: .month),
-                                y: .value("金额", highlighted.amount)
+                                x: .value(String(localized: "月份"), highlighted.date, unit: .month),
+                                y: .value(String(localized: "金额"), highlighted.amount)
                             )
                             .symbolSize(80)
                             .foregroundStyle(type.color)
@@ -418,50 +471,16 @@ struct TrendAnalysisView: View {
                 .cornerRadius(DesignConstants.CornerRadius.extraLarge)
                 .padding(.horizontal)
                 
-                // --- 2. 卡片选择列表 ---
-                List {
-                    Section(header: Text("选择卡片查看详情")) {
-                        Button(action: { withAnimation { selectedCard = nil } }) {
-                            HStack {
-                                ZStack {
-                                    Circle().fill(Color.gray.opacity(0.2)).frame(width: 40, height: 40)
-                                    Image(systemName: "square.stack.3d.up.fill").foregroundColor(.primary)
-                                }
-                                Text("所有卡片汇总").foregroundColor(.primary).font(.body)
-                                Spacer()
-                                if selectedCard == nil {
-                                    Image(systemName: "checkmark").foregroundColor(.blue)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        
-                        ForEach(cards) { card in
-                            Button(action: { withAnimation { selectedCard = card } }) {
-                                HStack {
-                                    Circle()
-                                        .fill(LinearGradient(colors: card.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Text(card.bankName.prefix(1))
-                                                .font(.caption.bold())
-                                                .foregroundColor(.white)
-                                        )
-                                    VStack(alignment: .leading) {
-                                        Text(card.bankName).foregroundColor(.primary).font(.body)
-                                        Text(card.type).font(.subheadline).foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    if selectedCard == card {
-                                        Image(systemName: "checkmark").foregroundColor(.blue)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
+                // --- 2. 扇形图区域 ---
+                HStack(alignment: .top, spacing: 12) {
+                    // 按卡片分类扇形图
+                    pieChartSection(title: String(localized: "卡片\(type.title)占比"), data: cardPieData)
+                    // 按消费类别扇形图
+                    pieChartSection(title: String(localized: "类别\(type.title)占比"), data: categoryPieData)
                 }
-                .listStyle(.insetGrouped)
+                .padding(.horizontal)
+            }
+            .padding(.bottom, 20)
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(
@@ -507,5 +526,66 @@ struct TrendAnalysisView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(uiColor: .tertiarySystemGroupedBackground))
         )
+    }
+    
+    @ViewBuilder
+    private func pieChartSection(title: String, data: [PieSliceData]) -> some View {
+        let total = data.reduce(0) { $0 + $1.amount }
+        
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.secondary)
+            
+            if data.isEmpty || total <= 0 {
+                Text(String(localized: "暂无数据"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 140)
+            } else {
+                Chart(data) { slice in
+                    SectorMark(
+                        angle: .value(slice.label, slice.amount),
+                        innerRadius: .ratio(0.55),
+                        angularInset: 1.5
+                    )
+                    .foregroundStyle(slice.color)
+                    .cornerRadius(4)
+                }
+                .frame(height: 140)
+                
+                // 图例
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(data) { slice in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(slice.color)
+                                .frame(width: 8, height: 8)
+                            Text(slice.label)
+                                .font(.system(size: 11))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(formattedPercent(slice.amount, total: total))
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(DesignConstants.CornerRadius.extraLarge)
+    }
+    
+    private func formattedPercent(_ amount: Double, total: Double) -> String {
+        guard total > 0 else { return "0%" }
+        let pct = amount / total * 100
+        if pct < 1 {
+            return String(format: "%.1f%%", pct)
+        }
+        return String(format: "%.0f%%", pct)
     }
 }

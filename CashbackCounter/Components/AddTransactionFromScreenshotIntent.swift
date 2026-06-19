@@ -199,7 +199,8 @@ struct AddTransactionFromScreenshotIntent: AppIntent {
                 receiptData: receiptData,
                 billingAmount: billingAmount,
                 cashbackAmount: cashback,
-                pointsEarned: pointsEarned
+                pointsEarned: pointsEarned,
+                paymentMethod: .online
             )
             modelContext.insert(newTransaction)
             try modelContext.save()
