@@ -93,34 +93,66 @@ extension Point {
     static func syncDefaultPoints(in context: ModelContext) throws {
             let descriptor = FetchDescriptor<Point>()
             let currentPoints = try context.fetch(descriptor)
-            
-            // 改进 1：安全地构建字典，防止重复 Key 导致崩溃闪退
-            let currentMap = Dictionary(
-                currentPoints.map { (templateKey(for: $0), $0) },
-                uniquingKeysWith: { (existing, _) in existing } // 如果发现重复，保留已存在的第一条
-            )
+
+            // ── 第 1 步：去重 ──
+            // 按 templateKey 分组，如果同一个 key 下有多条记录，说明发生了重复
+            // （覆盖安装后 iCloud 同步 + 本地种子插入会导致此情况）
+            let grouped = Dictionary(grouping: currentPoints) { templateKey(for: $0) }
 
             var hasChanges = false
+            var deduplicatedMap: [String: Point] = [:]
 
+            for (key, points) in grouped {
+                if points.count > 1 {
+                    // 保留关联关系最多的那条（防止删除已被用户绑定到卡片/调整记录的 Point）
+                    let sorted = points.sorted {
+                        let aCount = ($0.cards?.count ?? 0) + ($0.adjustments?.count ?? 0)
+                        let bCount = ($1.cards?.count ?? 0) + ($1.adjustments?.count ?? 0)
+                        return aCount > bCount
+                    }
+                    let keeper = sorted[0]
+                    deduplicatedMap[key] = keeper
+
+                    // 将被删除的重复项上的关联关系迁移到保留项
+                    for duplicate in sorted.dropFirst() {
+                        // 迁移信用卡关联
+                        if let cards = duplicate.cards {
+                            for card in cards {
+                                card.pointProgram = keeper
+                            }
+                        }
+                        // 迁移积分调整记录关联
+                        if let adjustments = duplicate.adjustments {
+                            for adjustment in adjustments {
+                                adjustment.pointProgram = keeper
+                            }
+                        }
+                        context.delete(duplicate)
+                        hasChanges = true
+                    }
+                } else if let point = points.first {
+                    deduplicatedMap[key] = point
+                }
+            }
+
+            // ── 第 2 步：同步种子数据 ──
             for seed in defaultSeeds {
                 let key = seed.templateKey
-                
-                if let existingPoint = currentMap[key] {
-                    // 改进 2：业务逻辑扩展 - 同步默认值的更新（例如积分价值改变）
-                    // 如果 CashbackCounter 允许用户自定义修改这些默认积分的值，那么这里可能需要更复杂的判断
-                    // 但如果是纯只读的全局基准价值，应该用以下代码覆盖更新：
+
+                if let existingPoint = deduplicatedMap[key] {
+                    // 同步默认积分价值的更新
                     if existingPoint.pointValue != seed.pointValue {
                         existingPoint.pointValue = seed.pointValue
                         hasChanges = true
                     }
                 } else {
-                    // 改进 3：插入全新缺失的数据
+                    // 插入全新缺失的种子数据
                     context.insert(seed.makeModel())
                     hasChanges = true
                 }
             }
 
-            // 改进 4：有实质性变更时才显式落盘，保证数据安全
+            // ── 第 3 步：有实质性变更时才落盘 ──
             if hasChanges {
                 if context.hasChanges {
                     try context.save()

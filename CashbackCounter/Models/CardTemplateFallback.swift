@@ -550,7 +550,7 @@ let defaultCardTemplatesJSON = """
       "grocery",
       200
     ],
-    "pictureURL" : "",
+    "pictureURL" : "amexusbevy",
     "type" : "Bevy",
     "foreignBaseCap" : 0,
     "localBaseCap" : 0,
