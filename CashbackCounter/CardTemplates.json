@@ -690,6 +690,43 @@
       }
     },
     "specialRate" : [
+        "dining",
+        200,
+        "travel",
+        200,
+        "other",
+        800
+    ],
+    "pictureURL" : "chaseihgpremier",
+    "type" : "IHG Premier",
+    "foreignBaseCap" : 300,
+    "localBaseCap" : 300,
+    "categoryCaps" : [
+    ],
+    "rewardType" : "points",
+    "pointProgramKey" : "ihg|point|usd",
+    "region" : "美国",
+    "paymentCaps" : [
+
+    ],
+    "colors" : [
+      "24133F",
+      "D92344"
+    ],
+    "foreignCurrencyRate" : 100,
+    "paymentMethodRates" : [
+
+    ],
+    "bankName" : "Chase",
+    "defaultRate" : 100
+  },
+  {
+    "capPeriod" : {
+      "yearly" : {
+
+      }
+    },
+    "specialRate" : [
 
     ],
     "pictureURL" : "ready",
