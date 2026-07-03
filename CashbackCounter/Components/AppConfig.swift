@@ -13,7 +13,7 @@ enum AppConfig {
     // MARK: - 远程 API 地址
 
     /// 信用卡模板配置文件（GitHub Raw）
-    static let cardTemplatesURL = URL(string: "https://raw.githubusercontent.com/junhaohuang/CashbackCounterConfig/main/CardTemplates.json")!
+    static let cardTemplatesURL = URL(string: "https://raw.githubusercontent.com/RayTracingON/CashbackCounter/refs/heads/Master/CashbackCounter/CardTemplates.json")!
 
     /// 汇率 API 基础地址（fawazahmed0 开源汇率 API）
     static let currencyAPIBaseURL = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/"

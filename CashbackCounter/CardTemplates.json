@@ -50,7 +50,7 @@
     "localBaseCap" : 2400,
     "categoryCaps" : [
       "dining",
-      500
+      980
     ],
     "rewardType" : "points",
     "pointProgramKey" : "hsbc hk|rc|hkd",
@@ -759,11 +759,11 @@
     ],
     "pictureURL" : "icbcasiavs",
     "type" : "Visa Signature",
-    "foreignBaseCap" : 0,
+    "foreignBaseCap" : 1.5,
     "categoryCaps" : [
 
     ],
-    "localBaseCap" : 0,
+    "localBaseCap" : 1.5,
     "rewardType" : "cashback",
     "paymentCaps" : [
 
@@ -787,13 +787,15 @@
       }
     },
     "specialRate" : [
-
+      "grocery",
+      9
     ],
     "pictureURL" : "icbcasiagba",
     "type" : "粵港澳灣區信用卡",
     "foreignBaseCap" : 0,
     "categoryCaps" : [
-
+      "grocery",
+      190
     ],
     "localBaseCap" : 0,
     "rewardType" : "cashback",
