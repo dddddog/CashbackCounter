@@ -48,12 +48,12 @@ struct CurrencyService {
             let lastBase = UserDefaults.standard.string(forKey: kBaseKey),
             lastBase == base,
             Calendar.current.isDateInToday(lastDate)
-        {
-            // 如果最后更新时间是“今天”，并且基准币种一致，直接读缓存
-            if let cachedRates = loadLocalRates() {
-                print("✅ 汇率无需更新，使用本地缓存 (\(base))")
-                return cachedRates
-            }
+//         {
+//             // 如果最后更新时间是“今天”，并且基准币种一致，直接读缓存
+//             if let cachedRates = loadLocalRates() {
+//                 print("✅ 汇率无需更新，使用本地缓存 (\(base))")
+//                 return cachedRates
+//             }
         }
 
         print("🌍 正在联网更新汇率 (base: \(base))...")
@@ -63,9 +63,9 @@ struct CurrencyService {
             saveRatesLocally(rates, base: base)
             return rates
         } catch {
-            print("❌ 网络请求失败: \(error)")
-            if let cached = loadLocalRates(), cached.base.caseInsensitiveCompare(base) == .orderedSame {
-                return cached.rates
+//             print("❌ 网络请求失败: \(error)")
+//             if let cached = loadLocalRates(), cached.base.caseInsensitiveCompare(base) == .orderedSame {
+//                 return cached.rates
             }
             return [base: 1.0]
         }
@@ -94,9 +94,9 @@ struct CurrencyService {
     }
 
     // --- 内部方法：读取 UserDefaults ---
-    private static func loadLocalRates() -> CachedRates? {
-        guard let data = UserDefaults.standard.data(forKey: kRatesKey) else { return nil }
-        return try? JSONDecoder().decode(CachedRates.self, from: data)
-    }
+//     private static func loadLocalRates() -> CachedRates? {
+//         guard let data = UserDefaults.standard.data(forKey: kRatesKey) else { return nil }
+//         return try? JSONDecoder().decode(CachedRates.self, from: data)
+//     }
     
 }

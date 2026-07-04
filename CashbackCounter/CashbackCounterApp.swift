@@ -13,8 +13,7 @@ import SwiftData
 struct CashbackCounterApp: App { // 2. 这个结构体必须遵守 App 协议
     @AppStorage("userTheme") private var userTheme: Int = 0
     @AppStorage("userLanguage") private var userLanguage: String = "system"
-    @StateObject private var aiAvailability = AppleIntelligenceAvailability()
-    
+
     init() {
         NotificationManager.shared.requestAuthorization()
     }

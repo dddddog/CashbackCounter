@@ -27,11 +27,6 @@ struct AddTransactionView: View {
     @State private var paymentMethod: PaymentMethod = .offline
     @State private var rewardPreview: RewardPreview?
     
-    // AI 分析状态
-    @State private var isAnalyzing: Bool = false
-    @EnvironmentObject private var aiAvailability: AppleIntelligenceAvailability
-    @State private var showFullImage = false
-    @State private var showImagePicker: Bool = false
 
     
     // --- 3. 自定义初始化 ---
