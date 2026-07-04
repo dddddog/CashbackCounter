@@ -1,0 +1,45 @@
+name: Build & Release TrollStore IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build App (no signing)
+        run: |
+          xcodebuild \
+          -scheme CashbackCounter \
+          -configuration Release \
+          -sdk iphoneos \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          build
+
+      - name: Find .app
+        run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" | head -n 1)
+          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r CashbackCounter.ipa Payload
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: CashbackCounter IPA Build ${{ github.run_number }}
+          files: CashbackCounter.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
