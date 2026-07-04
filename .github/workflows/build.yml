@@ -1,0 +1,44 @@
+name: Build IPA for TrollStore
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: 'latest-stable'
+
+    - name: Build App (Force iOS 16 Compatibility)
+      run: |
+        WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+        PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
+        
+        # 加上 IPHONEOS_DEPLOYMENT_TARGET=16.0 確保 iOS 16 完美運行
+        if [ -n "$WORKSPACE" ]; then
+          echo "Building Workspace..."
+          xcodebuild clean build -workspace "$WORKSPACE" -scheme "CashbackCounter" -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=16.0
+        else
+          echo "Building Project..."
+          xcodebuild clean build -project "$PROJECT" -scheme "CashbackCounter" -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=16.0
+        fi
+
+    - name: Package to IPA (For TrollStore)
+      run: |
+        mkdir -p Payload
+        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d | head -n 1)
+        cp -r "$APP_PATH" Payload/
+        zip -r CashbackCounter.ipa Payload
+
+    - name: Upload IPA Artifact
+      uses: actions/artifacts@v4
+      with:
+        name: CashbackCounter-TrollStore
+        path: CashbackCounter.ipa
