@@ -1,4 +1,4 @@
-name: Build Stable IPA (TrollStore Ready)
+name: Build Stable IPA (TrollStore Fixed)
 
 on:
   workflow_dispatch:
@@ -13,45 +13,65 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
 
-      # 🧠 关键：降低 Swift 并发严格性（解决你之前 Sendable 问题）
-      - name: Build App (stable build)
+      # 🧠 Step 1: clean build dir（避免旧缓存污染）
+      - name: Clean DerivedData
+        run: rm -rf build
+
+      # 🧠 Step 2: 强制正确 build（关键）
+      - name: Build App
         run: |
           xcodebuild clean build \
-          -scheme "CashbackCounter" \
-          -configuration Release \
-          -sdk iphoneos \
-          -destination "generic/platform=iOS" \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          ONLY_ACTIVE_ARCH=NO \
-          SWIFT_STRICT_CONCURRENCY=targeted \
-          OTHER_SWIFT_FLAGS="-suppress-warnings" \
-          | xcpretty || true
+            -scheme "CashbackCounter" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            SWIFT_STRICT_CONCURRENCY=targeted
 
-      # 📦 找到真正生成的 .app（比 DerivedData 稳定）
-      - name: Locate .app
-        id: app
+      # 🧠 Step 3: 强制检查 .app 是否存在（你之前失败的关键）
+      - name: Verify .app exists
         run: |
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" | head -n 1)
-          echo "APP_PATH=$APP_PATH"
-          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          APP_PATH=$(find build -type d -name "*.app" | head -n 1)
 
-      # 📦 打包 IPA（TrollStore 可用结构）
+          echo "Found app path: $APP_PATH"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ ERROR: No .app found - build failed"
+            exit 1
+          fi
+
+          # 🔥 检查 executable（关键！你现在的问题就在这里）
+          if [ ! -f "$APP_PATH/$(basename "$APP_PATH" .app)" ]; then
+            echo "❌ ERROR: No executable binary inside .app"
+            ls -R "$APP_PATH"
+            exit 1
+          fi
+
+          echo "app_path=$APP_PATH" >> $GITHUB_ENV
+
+      # 📦 Step 4: 正确打包 IPA（标准 TrollStore 结构）
       - name: Create IPA
         run: |
           mkdir -p Payload
-          cp -r "${{ steps.app.outputs.app_path }}" Payload/
+          cp -r "$app_path" Payload/
+
+          # 🔥 再次验证结构
+          ls -R Payload
+
           zip -r CashbackCounter.ipa Payload
 
-      # 📤 上传 Release（稳定版本）
-      - name: Upload Release
+      # 📤 Step 5: Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
